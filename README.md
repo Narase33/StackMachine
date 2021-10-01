@@ -19,11 +19,11 @@ While implementing the new feature I might see that it's hard for the interprete
 In this case the feature changes in order to have a syntax thats better/faster to interpret.
 
 
-Since the project is far from beeing finished there is no plug&play way of using it at this time. You can start the project and see that the UnitTests are successful, but thats it.
+Since the project is far away from beeing finished there is no plug&play way of actually using it at this time. You can start the project and see that the UnitTests are successful, but thats it.
 
-UnitTests are (currently) by the way also the best way to see what features the language has.
+UnitTests are currently also the best way to see what features the language already has what it looks like.
 
-This project has a goal to be easy to build.
-I won't use any libs that need to be installed (well, except for the STL), even if that means to reinvent the wheel from time to time.
+This project has the goal to be easy to build.
+I won't use any libs that need to be installed (except for the STL, ofc), even if that means to reinvent the wheel from time to time.
 I won't use any platform specific functions or any other stuff that might trouble the building process.
-There is a (c)make file that is guaranteed to work as long as you have an up to date compiler with the current (C++17) version of C++.
+There is a cmake file that is guaranteed to work as long as you have a compiler that is able to use C++17.
