@@ -1,19 +1,14 @@
 #pragma once
 
-#include <exception>
+#include <stdexcept>
 #include <string>
 
 using namespace std::string_literals;
 
 namespace ex {
-	class Exception : public std::exception {
-		const std::string msg;
+	class Exception : public std::runtime_error {
 	public:
-		Exception(std::string&& msg) : msg(std::move(msg)) {}
-
-		const char* what() const override {
-			return msg.c_str();
-		}
+		using std::runtime_error::runtime_error;
 	};
 
 	void assure(bool condition, std::string&& msg) {

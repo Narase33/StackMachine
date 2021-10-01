@@ -12,17 +12,19 @@ namespace {
 		const std::string name = a.toString() + " " + getName(op) + " " + b.toString();
 		SECTION(name) {
 			try {
-				StackMachine machine;
+				std::list<base::StackFrame> programm = {
+					StackFrame(Operator::LOAD, StackType(a)),
+					StackFrame(Operator::LOAD, StackType(b)),
+					StackFrame(op)
+				};
 
-				machine.add(op);
-				machine.add(Operator::LOAD, b);
-				machine.add(Operator::LOAD, a);
+				StackMachine machine(std::move(programm));
 
 				INFO(machine.toString());
 
 				const auto result = machine.exec();
 				REQUIRE(result.has_value());
-				REQUIRE(result.value() == expected);
+				REQUIRE((result.value() == expected).getBool());
 			} catch (const std::exception & e) {
 				FAIL(e.what());
 			}
@@ -31,8 +33,8 @@ namespace {
 }
 
 TEST_CASE("Operator-Test") {
-	test(Operator::ADD, 6, 2, 8);
-	test(Operator::SUB, 6, 2, 4);
-	test(Operator::MULT, 6, 2, 12);
-	test(Operator::DIV, 6, 2, 3);
+	test(Operator::ADD, base::ValueType(6), base::ValueType(2), base::ValueType(8));
+	test(Operator::SUB, base::ValueType(6), base::ValueType(2), base::ValueType(4));
+	test(Operator::MULT, base::ValueType(6), base::ValueType(2), base::ValueType(12));
+	test(Operator::DIV, base::ValueType(6), base::ValueType(2), base::ValueType(3));
 }

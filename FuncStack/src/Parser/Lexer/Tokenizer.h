@@ -6,26 +6,47 @@
 #include <optional>
 #include <sstream>
 
-#include "src/Base/Type.h"
+#include "src/Base/StackType.h"
 #include "src/Base/OperatorAttributes.h"
-#include "src/Base/OpCode.h"
+#include "src/Base/StackFrame.h"
 
 namespace {
 	using stringConstIterator = std::string::const_iterator;
-	using ExtractorResult = std::optional<base::OpCode>;
+	using ExtractorResult = std::optional<base::StackFrame>;
 
 	class SourceStream {
 		const std::string& source;
 		stringConstIterator pos;
 		stringConstIterator saved_pos;
+
 	public:
-		SourceStream(const std::string& source) : source(source) { pos = this->source.begin(); }
-		bool isEnd() const { return pos == source.end(); }
-		bool is(char c) const { return !isEnd() and (*pos == c); }
-		char peak() const { return *pos; }
-		char pop() { return *pos++; }
-		void save() { saved_pos = pos; }
-		void rewind() { pos = saved_pos; }
+		SourceStream(const std::string& source) : source(source) {
+			pos = this->source.begin();
+		}
+
+		bool isEnd() const {
+			return pos == source.end();
+		}
+
+		bool is(char c) const {
+			return !isEnd() and (*pos == c); 
+		}
+
+		char peak() const {
+			return *pos;
+		}
+
+		char pop() {
+			return *pos++;
+		}
+
+		void save() { 
+			saved_pos = pos; 
+		}
+
+		void rewind() { 
+			pos = saved_pos; 
+		}
 	};
 
 	class Extractor {
@@ -64,7 +85,7 @@ namespace {
 
 				stream.rewind();
 				if (!validated.empty()) {
-					return base::fromSymbol(validated.c_str()).op;
+					return base::StackFrame(base::fromSymbol(validated.c_str()).op);
 				}
 			}
 			return {};
@@ -80,11 +101,11 @@ namespace {
 					const std::string lexem = extractLexem(stream, recognizer);
 
 					if ((lexem == "true") or (lexem == "false")) {
-						return base::OpCode(base::Operator::LOAD, lexem == "true"); // Literal Bool
+						return base::StackFrame(base::Operator::LOAD, base::StackType(base::ValueType(lexem == "true"))); // Literal Bool
 					} else if (base::isSymbol(lexem.c_str())) {
-						return base::fromSymbol(lexem.c_str()).op; // Type Keyword
+						return base::StackFrame(base::fromSymbol(lexem.c_str()).op); // Type Keyword
 					} else {
-						return base::OpCode(base::Operator::LOAD, lexem); // Name
+						return base::StackFrame(base::Operator::LOAD, base::StackType(lexem)); // Name
 					}
 				}
 			}
@@ -105,11 +126,12 @@ namespace {
 
 					if (isDigit(stream)) {
 						currentToken += '.' + extractNumber(stream);
-						return base::OpCode(base::Operator::LOAD, std::stold(currentToken)); // Literal Double
+						base::ValueType value(std::stold(currentToken));
+						return base::StackFrame(base::Operator::LOAD, base::StackType(std::move(value))); // Literal Double
 					}
 					stream.rewind();
 				}
-				return base::OpCode(base::Operator::LOAD, std::stoll(currentToken)); // Literal Long
+				return base::StackFrame(base::Operator::LOAD, base::StackType(base::ValueType(std::stoll(currentToken)))); // Literal Long
 			}
 			return {};
 		}
@@ -130,8 +152,8 @@ namespace {
 }
 
 namespace lexer {
-	std::vector<base::OpCode> tokenize(const std::string& expression) {
-		std::vector<base::OpCode> out;
+	std::vector<base::StackFrame> tokenize(const std::string& expression) {
+		std::vector<base::StackFrame> out;
 		SourceStream stream(expression);
 
 		static const std::initializer_list<Extractor*> extractors = {
@@ -147,7 +169,7 @@ namespace lexer {
 			}
 
 			for (const auto& i : extractors) {
-				auto result = i->extract(stream);
+				const std::optional<base::StackFrame> result = i->extract(stream);
 				if (result.has_value()) {
 					out.push_back(result.value());
 					continue;

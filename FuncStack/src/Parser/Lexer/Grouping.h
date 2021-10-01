@@ -7,8 +7,8 @@
 
 namespace lexer {
 	class GroupOrganizer {
-		using it = std::vector<base::OpCode>::const_iterator;
-		using OpStream = utils::Stream<base::OpCode>;
+		using it = std::vector<base::StackFrame>::const_iterator;
+		using OpStream = utils::Stream<base::StackFrame>;
 
 		OpStream inputTokens;
 		std::vector<Node> outputNodes;
@@ -28,20 +28,28 @@ namespace lexer {
 		}
 
 		bool extractGroup() {
-			for (const auto braceGroup : { base::Operator::BRACE_GROUP, base::Operator::BRACKET_GROUP }) {
-				const auto [open, close] = FromGroupBrace(braceGroup);
+			base::Operator open = base::Operator::NONE;
+			base::Operator close = base::Operator::NONE;
+			base::Operator group = base::Operator::NONE;
 
-				if (inputTokens->isOperator(open)) {
-					inputTokens.next();
-					const auto _begin = inputTokens.pos();
-					unwind(open, close);
-
-					outputNodes.emplace_back(braceGroup, GroupOrganizer::run(OpStream(_begin, inputTokens.pos())));
-					return true;
-				}
+			if (inputTokens->isOperator(base::Operator::BRACE_OPEN)) {
+				std::tie(open, close) = FromGroupBrace(base::Operator::BRACE_GROUP);
+				group = base::Operator::BRACE_GROUP;
+			}
+			else if (inputTokens->isOperator(base::Operator::BRACKET_OPEN)) {
+				std::tie(open, close) = FromGroupBrace(base::Operator::BRACKET_GROUP);
+				group = base::Operator::BRACKET_GROUP;
+			}
+			else {
+				return false;
 			}
 
-			return false;
+			inputTokens.next();
+			const auto _begin = inputTokens.pos();
+			unwind(open, close);
+
+			outputNodes.emplace_back(base::StackFrame(group), GroupOrganizer::run(OpStream(_begin, inputTokens.pos())));
+			return true;
 		}
 
 		GroupOrganizer(OpStream tokenStream) : inputTokens(tokenStream) {
@@ -53,6 +61,7 @@ namespace lexer {
 				inputTokens.next();
 			}
 		}
+
 	public:
 		static std::vector<Node> run(OpStream tokenStream) {
 			return GroupOrganizer(tokenStream).outputNodes;

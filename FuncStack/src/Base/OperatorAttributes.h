@@ -4,11 +4,14 @@
 #include <array>
 #include <unordered_map>
 #include <optional>
+#include <stdexcept>
 
-#include "Type.h"
+#include "StackType.h"
+#include "src/Utils/Utils.h"
 
 namespace base {
 	enum class Operator {
+		NONE, END,
 		JUMP, JUMP_IF, JUMP_LABEL, JUMP_LABEL_IF, LABEL, ERR,
 		LOAD, STORE, POP,
 		IF, ELSE,
@@ -37,8 +40,9 @@ namespace base {
 		OperatorAttribute(Operator::ELSE, "ELSE", "else", 0, 0), // Lexer, Parser
 		OperatorAttribute(Operator::BRACE_OPEN, "BRACE_OPEN", "(", 0, 0), // Lexer, Parser
 		OperatorAttribute(Operator::BRACE_CLOSE, "BRACE_CLOSE", ")", 0, 0), // Lexer, Parser
-		OperatorAttribute(Operator::BRACKET_OPEN, "BRACKET_OPEN", "{", 0, 0), // Lexer, Parser
-		OperatorAttribute(Operator::BRACKET_CLOSE, "BRACKET_CLOSE", "}", 0, 0), // Lexer, Parser
+
+		OperatorAttribute(Operator::BRACKET_OPEN, "BRACKET_OPEN", "{", 0, 0), // Lexer, Parser, Exec
+		OperatorAttribute(Operator::BRACKET_CLOSE, "BRACKET_CLOSE", "}", 0, 0), // Lexer, Parser, Exec
 
 		OperatorAttribute(Operator::LOAD, "LOAD", "", 1,  0), // Lexer, Parser, Exec
 		OperatorAttribute(Operator::STORE, "STORE", "=", -1, 0), // Lexer, Parser, Exec
@@ -68,9 +72,10 @@ namespace base {
 
 		OperatorAttribute(Operator::JUMP, "JUMP", "", 0, 0), // Parser, Exec
 		OperatorAttribute(Operator::JUMP_IF, "JUMP_IF", "", 0, 0), // Parser, Exec
-		
-		OperatorAttribute(Operator::POP, "POP", "", -1, 0), // Parser, Exec
 
+		OperatorAttribute(Operator::POP, "POP", "", -1, 0), // Parser, Exec
+		OperatorAttribute(Operator::NONE, "NONE", "", 0, 0), // Parser, Exec
+		OperatorAttribute(Operator::END, "END", "", 0, 0), // Parser, Exec
 	};
 
 	constexpr OperatorAttribute getAttribute(Operator op) {
@@ -108,15 +113,8 @@ namespace base {
 		return false;
 	}
 
-	constexpr bool producesBool(Operator op) {
-		switch (op) {
-			case Operator::BIGGER:
-			case Operator::LESS:
-			case Operator::EQ:
-			case Operator::UNEQ: return true;
-		}
-
-		return false;
+	bool producesBool(Operator op) {
+		return utils::any_of(op, { Operator::BIGGER, Operator::LESS, Operator::EQ, Operator::UNEQ });
 	}
 
 	constexpr bool bigger(Operator a, Operator b) {
@@ -138,7 +136,7 @@ namespace base {
 			case Operator::BRACKET_OPEN:
 			case Operator::BRACKET_CLOSE: return Operator::BRACKET_GROUP;
 			default:
-				throw std::exception("Unknown group operator");
+				throw std::runtime_error("Unknown group operator"s + getName(brace));
 		}
 	}
 
@@ -147,7 +145,18 @@ namespace base {
 			case Operator::BRACE_GROUP: return std::make_pair(Operator::BRACE_OPEN, Operator::BRACE_CLOSE);
 			case Operator::BRACKET_GROUP: return std::make_pair(Operator::BRACKET_OPEN, Operator::BRACKET_CLOSE);
 			default:
-				throw std::exception("Unknown group operator");
+				throw std::runtime_error("Unknown group operator"s + getName(brace));
+		}
+	}
+
+	constexpr Operator switchJump(Operator jump) {
+		switch (jump) {
+			case Operator::JUMP: return Operator::JUMP_LABEL;
+			case Operator::JUMP_IF: return Operator::JUMP_LABEL_IF;
+			case Operator::JUMP_LABEL: return Operator::JUMP;
+			case Operator::JUMP_LABEL_IF: return Operator::JUMP_IF;
+			default:
+				throw std::runtime_error("Unknown jump operator"s + getName(jump));
 		}
 	}
 }

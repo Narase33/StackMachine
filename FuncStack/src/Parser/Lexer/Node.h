@@ -2,25 +2,25 @@
 
 #include <vector>
 
-#include "src/Base/OpCode.h"
+#include "src/Base/StackFrame.h"
 #include "src/Utils/Utils.h"
 #include "src/Exception.h"
 
 namespace lexer {
 	class Node {
-		base::OpCode op;
+		base::StackFrame op;
 		std::vector<Node> group;
 
 	public:
-		Node(base::OpCode op) : op(op) {
+		Node(base::StackFrame op) : op(std::move(op)) {
 			// empty 
 		}
 
-		Node(base::OpCode op, std::vector<Node> group) : op(op), group(std::move(group)) {
-			ex::assure(isGroup(), "Got non-group OpCode");
+		Node(base::StackFrame op, std::vector<Node> group) : op(std::move(op)), group(std::move(group)) {
+			ex::assure(isGroup(), "Got non-group StackFrame");
 		}
 
-		base::OpCode getOpCode() const {
+		const base::StackFrame& getStackFrame() const {
 			return op;
 		}
 

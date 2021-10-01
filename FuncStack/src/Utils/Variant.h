@@ -8,18 +8,12 @@ namespace utils {
 	template <class... T >
 	class Variant {
 	public:
-		constexpr Variant() {
-			// empty
-		}
+		constexpr Variant() { /* empty */ }
 
 		template <class Type>
-		constexpr Variant(Type v) : value(v) {
+		constexpr Variant(Type v) : value(v) { /* empty */ }
 
-		}
-
-		constexpr Variant(const Variant<T...>& other) : value(other.value) {
-			// empty
-		}
+		constexpr Variant(const Variant<T...>& other) : value(other.value) { /*empty */ }
 
 		constexpr Variant(Variant&& other) = default;
 
@@ -42,7 +36,7 @@ namespace utils {
 		}
 
 		template<typename Type>
-		constexpr bool verify(std::function<bool(const Type & t)> operator_test) const {
+		constexpr bool verify(std::function<bool(const Type& t)> operator_test) const {
 			return holds<Type>() and operator_test(std::get<Type>(value));
 		}
 
@@ -66,6 +60,20 @@ namespace utils {
 
 		constexpr bool operator!=(const Variant& other) const {
 			return this->value != other.value;
+		}
+
+		std::string toString() const {
+			std::ostringstream o;
+			o << *this;
+			return o.str();
+		}
+
+		friend std::ostream& operator<<(std::ostream& o, const Variant& type) {
+			o << std::boolalpha;
+			std::visit([&](auto&& a) {
+				o << a;
+			}, type.inner());
+			return o;
 		}
 	private:
 		std::variant<T...> value;

@@ -11,48 +11,71 @@ using namespace parser;
 using namespace std::string_literals;
 
 TEST_CASE("Variable-Test") {
-	StackMachine machine;
-
+	
 	SECTION("Load") {
-		REQUIRE(machine.size() == 0);
+		StackMachine machine(std::list<StackFrame>{StackFrame(Operator::LOAD, StackType("a"s))});
+		machine.set("a", ValueType(3.0));
 
-		machine.add(Operator::LOAD, "a"s);
-		machine.set("a", 3.0);
-
-		REQUIRE(machine.exec().value() == 3.0);
+		REQUIRE((machine.exec().value() == ValueType(3.0)).getBool());
 	}
 
 	SECTION("Store") {
-		machine.add(Operator::LOAD, 4.0);
-		REQUIRE(machine.exec().value() == 4.0);
+		std::list<StackFrame> programm;
 
+		{
+			programm.push_back(StackFrame(Operator::LOAD, StackType(ValueType(4.0))));
+			StackMachine machine(programm);
+			REQUIRE((machine.exec().value() == ValueType(4.0)).getBool());
+		}
 
-		machine.add(Operator::STORE, "b"s);
-		REQUIRE(!machine.exec().has_value());
+		{
+			programm.push_back(StackFrame(Operator::STORE, StackType("b"s)));
+			StackMachine machine(programm);
+			REQUIRE(!machine.exec().has_value());
+		}
 
-		machine.add(Operator::LOAD, "b"s);
-		REQUIRE(machine.exec().value() == 4.0);
+		{
+			programm.push_back(StackFrame(Operator::LOAD, StackType("b"s)));
+			StackMachine machine(programm);
+			REQUIRE((machine.exec().value() == ValueType(4.0)).getBool());
+		}
 
+		{
+			programm.push_back(StackFrame(Operator::STORE, StackType("c"s)));
+			StackMachine machine(programm);
+			REQUIRE(!machine.exec().has_value());
+		}
 
-		machine.add(Operator::STORE, "c"s);
-		REQUIRE(!machine.exec().has_value());
+		{
+			programm.push_back(StackFrame(Operator::LOAD, StackType("c"s)));
+			StackMachine machine(programm);
+			REQUIRE((machine.exec().value() == ValueType(4.0)).getBool());
+		}
 
-		machine.add(Operator::LOAD, "c"s);
-		REQUIRE(machine.exec().value() == 4.0);
+		{
+			programm.push_back(StackFrame(Operator::POP));
+			programm.push_back(StackFrame(Operator::LOAD, StackType("b"s)));
+			StackMachine machine(programm);
+			REQUIRE((machine.exec().value() == ValueType(4.0)).getBool());
+		}
 
-		machine.add(Operator::LOAD, "b"s);
-		machine.add(Operator::POP);
-		REQUIRE(machine.exec().value() == 4.0);
+		{
+			programm.push_back(StackFrame(Operator::POP));
+			StackMachine machine(programm);
+			REQUIRE(!machine.exec().has_value());
+		}
 
+		{
+			programm.push_back(StackFrame(Operator::LOAD, StackType(ValueType(5.0))));
+			programm.push_back(StackFrame(Operator::STORE, StackType("b"s)));
+			StackMachine machine(programm);
+			REQUIRE(!machine.exec().has_value());
+		}
 
-		machine.add(Operator::POP);
-		REQUIRE(!machine.exec().has_value());
-
-		machine.add(Operator::STORE, "b"s);
-		machine.add(Operator::LOAD, 5.0);
-		REQUIRE(!machine.exec().has_value());
-
-		machine.add(Operator::LOAD, "b"s);
-		REQUIRE(machine.exec().value() == 5.0);
+		{
+			programm.push_back(StackFrame(Operator::LOAD, StackType("b"s)));
+			StackMachine machine(programm);
+			REQUIRE((machine.exec().value() == base::ValueType(5.0)).getBool());
+		}
 	}
 }

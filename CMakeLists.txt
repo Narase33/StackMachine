@@ -6,9 +6,11 @@ set(CMAKE_CXX_STANDARD 20)
 
 project ("FuncStack")
 
-# Include sub-projects.
-include_directories("FuncStack")
-
-add_executable(FuncStack FuncStack/FuncStack.cpp)
+add_executable(FuncStack FuncStack/FuncStack.cpp  "FuncStack/src/Stackmachine/Scope.h" "FuncStack/src/Base/ValueType.h" )
 
 target_compile_options(FuncStack PUBLIC "/permissive-")
+
+target_include_directories(FuncStack PUBLIC
+	${CMAKE_SOURCE_DIR}/src
+	${CMAKE_SOURCE_DIR}
+)

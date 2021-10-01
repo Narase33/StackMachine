@@ -2,43 +2,23 @@
 
 #include <list>
 #include <sstream>
+#include <vector>
 
-#include "src/Base/OpCode.h"
+#include "src/Base/StackFrame.h"
 #include "src/Utils/Utils.h"
 #include "src/Exception.h"
+#include "Scope.h"
 
 namespace stackmachine {
 	class StackMachine {
 	public:
 		StackMachine() = default;
 
-		void add(base::OpCode op) {
-			if ((op.getOperator() == base::Operator::LOAD) and op.value().holds<std::string>() and (variables.find(op.value().get<std::string>()) == variables.end())) {
-				variables[op.value().get<std::string>()] = std::nullopt;
-			}
-
-			opStack.push_back(op);
-		}
-
-		void add(base::Operator op) {
-			opStack.emplace_back(op);
-		}
-
-		void add(base::Operator op, base::ValueType data) {
-			opStack.emplace_back(op, data);
-		}
-
-		void add(base::Operator op, const std::string& data) {
-			if ((op == base::Operator::LOAD) && (variables.find(data) == variables.end())) {
-				variables[data] = std::nullopt;
-			}
-
-			opStack.emplace_back(op, data);
-		}
-
-		void add(std::list<base::OpCode> ops) {
-			std::stack<base::OpCode> tmp;
-			opStack.insert(opStack.end(), ops.begin(), ops.end());
+		StackMachine(std::list<base::StackFrame> toExecute) {
+			programm.reserve(toExecute.size() + 1);
+			std::move(toExecute.begin(), toExecute.end(), std::back_inserter(programm));
+			programm.push_back(base::StackFrame(base::Operator::END));
+			pc = programm.begin();
 		}
 
 		void set(const std::string& variableName, base::ValueType variableValue) {
@@ -56,25 +36,40 @@ namespace stackmachine {
 				}
 			}
 
-			while (!opStack.empty()) {
-				execNext(opStack.back());
-				opStack.pop_back();
+			while ((pc->getOperator() != base::Operator::END) && (pc != programm.end())) {
+				execNext();
+				pc++;
 			}
 
 			return dataStack.empty() ? std::optional<base::ValueType>(std::nullopt) : std::optional<base::ValueType>(resolve(dataStack.top()));
 		}
 
-		std::string toString() {
-			return utils::printStack(opStack);
+		std::string toString() const {
+			std::ostringstream stream;
+
+			stream << "Programm:" << std::endl;
+			for (const base::StackFrame& i : programm) {
+				std::string opValue;
+				if (i.hasValue()) {
+					const base::StackType& value = i.value();
+					opValue = " " + (value.isVariable() ? value.getVariableName() : value.getValue().toString());
+				}
+
+				stream << "\t" << getName(i.getOperator()) << opValue << std::endl;
+			}
+
+			return stream.str();
 		}
 
 		std::stack<base::StackType> getDataStack() const {
 			return dataStack;
 		}
+
 	private:
 		std::unordered_map<std::string, std::optional<base::ValueType>> variables;
 		std::stack<base::StackType> dataStack;
-		std::list<base::OpCode> opStack;
+		std::vector<base::StackFrame> programm;
+		std::vector<base::StackFrame>::const_iterator pc;
 
 		base::ValueType pop() {
 			const base::StackType data = dataStack.top();
@@ -83,49 +78,45 @@ namespace stackmachine {
 		}
 
 		base::ValueType resolve(base::StackType data) const {
-			return data.holds<base::ValueType>() ? data.get<base::ValueType>() : variables.at(data.get<std::string>()).value();
+			return data.isValue() ? data.getValue() : variables.at(data.getVariableName()).value();
 		}
 
-		void execNext(base::OpCode op) {
-			switch (op.getOperator()) {
-				case base::Operator::LOAD: dataStack.push(op.value()); break;
-				case base::Operator::STORE: variables[op.value().get<std::string>()] = pop(); break;
+		void execNext() {
+			switch (pc->getOperator()) {
+				case base::Operator::END: break;
+				case base::Operator::LOAD: dataStack.push(pc->value()); break;
+				case base::Operator::STORE: variables[pc->value().getVariableName()] = pop(); break;
 				case base::Operator::POP: pop(); break;
-				case base::Operator::INCR: executeOP([](base::ValueType a) {return a + 1; }); break;
-				case base::Operator::DECR: executeOP([](base::ValueType a) {return a - 1; }); break;
-				case base::Operator::EQ: executeOP([](base::ValueType a, base::ValueType b) {return a == b; }); break;
-				case base::Operator::UNEQ: executeOP([](base::ValueType a, base::ValueType b) {return a != b; }); break;
-				case base::Operator::ADD: executeOP([](base::ValueType a, base::ValueType b) {return a + b; }); break;
-				case base::Operator::SUB: executeOP([](base::ValueType a, base::ValueType b) {return a - b; }); break;
-				case base::Operator::MULT: executeOP([](base::ValueType a, base::ValueType b) {return a * b; }); break;
-				case base::Operator::DIV: executeOP([](base::ValueType a, base::ValueType b) {return a / b; }); break;
-				case base::Operator::LABEL: break;
-				case base::Operator::JUMP_LABEL_IF:
-					if (pop().get<bool>() == false) {
-						jumpToLabel(op.value().get<base::ValueType>().get<long>());
+				case base::Operator::INCR: executeOP(std::plus(), base::ValueType(1)); break;
+				case base::Operator::DECR: executeOP(std::minus(), base::ValueType(1)); break;
+				case base::Operator::EQ: executeOP(std::equal_to()); break;
+				case base::Operator::UNEQ: executeOP(std::not_equal_to()); break;
+				case base::Operator::ADD: executeOP(std::plus()); break;
+				case base::Operator::SUB: executeOP(std::minus()); break;
+				case base::Operator::MULT: executeOP(std::multiplies()); break;
+				case base::Operator::DIV: executeOP(std::divides()); break;
+				case base::Operator::JUMP:
+					pc += pc->value().getValue().getSigned() - 1; // loop will increment +1
+					break;
+				case base::Operator::JUMP_IF:
+					if (pop().getBool() == false) {
+						pc += pc->value().getValue().getSigned() - 1; // loop will increment +1
 					}
 					break;
-				case base::Operator::JUMP_LABEL: jumpToLabel(op.value().get<base::ValueType>().get<long>()); break;
 				default:
-					throw ex::Exception("Unrecognized token: "s + base::getName(op.getOperator()));
+					throw ex::Exception("Unrecognized token: "s + base::getName(pc->getOperator()));
 			}
 		}
 
 		void executeOP(std::function<base::ValueType(base::ValueType a, base::ValueType b)> func) {
 			base::ValueType a = pop();
 			base::ValueType b = pop();
-			dataStack.push(func(b, a));
+			dataStack.push(base::StackType(func(b, a)));
 		}
 
-		void executeOP(std::function<base::ValueType(base::ValueType a)> func) {
+		void executeOP(std::function<base::ValueType(base::ValueType a, base::ValueType b)> func, const base::ValueType& operand) {
 			base::ValueType a = pop();
-			dataStack.push(func(a));
-		}
-
-		void jumpToLabel(int index) {
-			while (!((opStack.back().getOperator() == base::Operator::LABEL) and (opStack.back().value().get<base::ValueType>().get<long>() == index))) {
-				opStack.pop_back();
-			}
+			dataStack.push(base::StackType(func(a, operand)));
 		}
 	};
 }
