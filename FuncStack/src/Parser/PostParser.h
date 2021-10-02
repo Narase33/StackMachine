@@ -24,6 +24,8 @@ namespace parser {
 		std::unordered_map<size_t, size_t> labels; /* index - position */
 		std::unordered_map<size_t, std::vector<JumpPoint>> jumps; /* index - jump-op */
 
+		std::vector<JumpPoint> optimizedJumps;
+
 		size_t currentPos = 0;
 		list::iterator it;
 
@@ -37,12 +39,17 @@ namespace parser {
 						for (JumpPoint& jumpPoint : jumps[labelId]) {
 							const base::Operator op = jumpPoint.frame->getOperator();
 							const int jumpDistance = static_cast<int>(currentPos - jumpPoint.pos);
-							*jumpPoint.frame = base::StackFrame(base::switchJump(op), base::StackType(base::ValueType(jumpDistance)));
+
+							if (std::abs(jumpDistance) > 1) {
+								*jumpPoint.frame = base::StackFrame(base::switchJump(op), base::StackType(base::ValueType(jumpDistance)));
+								optimizedJumps.push_back(jumpPoint);
+							} else {
+								deleteFrame(jumpPoint.frame, jumpPoint.pos);
+							}
 						}
 
 						labels[labelId] = currentPos;
-
-						deleteFrame(it);
+						deleteFrame(it, currentPos);
 						break;
 					}
 					case base::Operator::JUMP_LABEL: // fallthrough
@@ -55,7 +62,12 @@ namespace parser {
 							const base::Operator op = it->getOperator();
 							const int jumpDistance = static_cast<int>(jumpDestination->second - currentPos);
 
-							*it = base::StackFrame(base::switchJump(op), base::StackType(base::ValueType(jumpDistance)));
+							if (std::abs(jumpDistance) > 1) {
+								*it = base::StackFrame(base::switchJump(op), base::StackType(base::ValueType(jumpDistance)));
+								optimizedJumps.push_back(JumpPoint{ it, currentPos });
+							} else {
+								deleteFrame(it, currentPos);
+							}
 						} else {
 							jumps[labelId].push_back(JumpPoint{ it, currentPos });
 						}
@@ -66,10 +78,25 @@ namespace parser {
 			}
 		}
 
-		void deleteFrame(list::iterator& it) {
+		void deleteFrame(list::iterator& it, size_t pos) {
 			const auto toDelete = it--;
 			ops.erase(toDelete);
 			currentPos--;
+
+			for (JumpPoint& jump : optimizedJumps) {
+				if (jumpsOver(jump, pos)) {
+					sm_signed& jumpDistance = jump.frame->value().getValue().getSigned();
+					jumpDistance += (jumpDistance > 0) ? -1 : +1;
+					// TODO recursive
+				}
+			}
+		}
+
+		bool jumpsOver(const JumpPoint& jump, size_t pos) const {
+			const size_t from = jump.pos;
+			const size_t to = jump.pos + jump.frame->value().getValue().getSigned();
+			auto [min, max] = std::minmax(from, to);
+			return (min < pos) && (pos < max);
 		}
 	};
 }

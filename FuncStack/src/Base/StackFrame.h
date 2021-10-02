@@ -8,7 +8,11 @@ namespace base {
 		explicit StackFrame(Operator opCode) : _opCode(opCode), _value(std::nullopt) {}
 		explicit StackFrame() : StackFrame(Operator::ERR) {}
 
-		StackType value() const {
+		const StackType& value() const {
+			return _value.value();
+		}
+
+		StackType& value() {
 			return _value.value();
 		}
 

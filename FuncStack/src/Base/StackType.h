@@ -23,7 +23,11 @@ namespace base {
 			return std::get<std::string>(inner);
 		}
 
-		ValueType getValue() const {
+		const ValueType& getValue() const {
+			return std::get<base::ValueType>(inner);
+		}
+
+		ValueType& getValue() {
 			return std::get<base::ValueType>(inner);
 		}
 

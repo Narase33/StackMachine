@@ -47,7 +47,15 @@ namespace base {
 			return std::get<sm_signed>(inner);
 		}
 
+		sm_signed& getSigned() {
+			return std::get<sm_signed>(inner);
+		}
+
 		sm_unsigned getUnsigned() const {
+			return std::get<sm_unsigned>(inner);
+		}
+
+		sm_unsigned& getUnsigned() {
 			return std::get<sm_unsigned>(inner);
 		}
 
@@ -55,7 +63,15 @@ namespace base {
 			return std::get<sm_float>(inner);
 		}
 
+		sm_float& getFloat() {
+			return std::get<sm_float>(inner);
+		}
+
 		sm_bool getBool() const {
+			return std::get<sm_bool>(inner);
+		}
+		
+		sm_bool& getBool() {
 			return std::get<sm_bool>(inner);
 		}
 
