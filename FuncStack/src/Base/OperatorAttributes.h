@@ -6,14 +6,14 @@
 #include <optional>
 #include <stdexcept>
 
-#include "StackType.h"
+#include "StackFrame.h"
 #include "src/Utils/Utils.h"
 
 namespace base {
 	enum class Operator {
 		NONE, END,
 		JUMP, JUMP_IF, JUMP_LABEL, JUMP_LABEL_IF, LABEL, ERR,
-		LOAD, STORE, POP,
+		LOAD, STORE, POP, CREATE,
 		IF, ELSE,
 		BRACE_GROUP, BRACE_OPEN, BRACE_CLOSE, BRACKET_GROUP, BRACKET_OPEN, BRACKET_CLOSE,
 		EQ, UNEQ,
@@ -74,12 +74,13 @@ namespace base {
 		OperatorAttribute(Operator::JUMP_IF, "JUMP_IF", "", 0, 0), // Parser, Exec
 
 		OperatorAttribute(Operator::POP, "POP", "", -1, 0), // Parser, Exec
+		OperatorAttribute(Operator::CREATE, "CREATE", "", 0, 1), // Parser, Exec
 		OperatorAttribute(Operator::NONE, "NONE", "", 0, 0), // Parser, Exec
 		OperatorAttribute(Operator::END, "END", "", 0, 0), // Parser, Exec
 	};
 
 	constexpr OperatorAttribute getAttribute(Operator op) {
-		for (const auto& i : attributes) {
+		for (const OperatorAttribute& i : attributes) {
 			if (i.op == op) {
 				return i;
 			}
@@ -113,15 +114,7 @@ namespace base {
 		return false;
 	}
 
-	bool producesBool(Operator op) {
-		return utils::any_of(op, { Operator::BIGGER, Operator::LESS, Operator::EQ, Operator::UNEQ });
-	}
-
-	constexpr bool bigger(Operator a, Operator b) {
-		return getPriority(a) > getPriority(b);
-	}
-
-	constexpr int maxSize() {
+	constexpr size_t maxSize() {
 		size_t i = 0;
 		for (const auto& op : attributes) {
 			i = std::max(i, std::strlen(op.symbol));
@@ -131,9 +124,9 @@ namespace base {
 
 	constexpr Operator toGroupBrace(Operator brace) {
 		switch (brace) {
-			case Operator::BRACE_OPEN:
+			case Operator::BRACE_OPEN: // fallthrough
 			case Operator::BRACE_CLOSE: return Operator::BRACE_GROUP;
-			case Operator::BRACKET_OPEN:
+			case Operator::BRACKET_OPEN: // fallthrough
 			case Operator::BRACKET_CLOSE: return Operator::BRACKET_GROUP;
 			default:
 				throw std::runtime_error("Unknown group operator"s + getName(brace));

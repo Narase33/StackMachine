@@ -7,6 +7,14 @@
 using namespace std::string_literals;
 
 namespace utils {
+	template<class... Ts>
+	struct Overloaded : Ts... {
+		using Ts::operator()...;
+	};
+
+	template<class... Ts>
+	Overloaded(Ts...)->Overloaded<Ts...>;
+
 	template<typename T>
 	void transfer_single(std::stack<T>& from, std::stack<T>& to) {
 		to.push(from.top());

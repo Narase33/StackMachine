@@ -1,55 +1,66 @@
 #pragma once
 
-#include "OperatorAttributes.h"
+#include <sstream>
+
+#include "BasicType.h"
 
 namespace base {
-	struct StackFrame {
-		explicit StackFrame(Operator opCode, StackType value) : _opCode(opCode), _value(value) {}
-		explicit StackFrame(Operator opCode) : _opCode(opCode), _value(std::nullopt) {}
-		explicit StackFrame() : StackFrame(Operator::ERR) {}
+	class StackFrame {
+	public:
+		explicit StackFrame() = default;
+		explicit StackFrame(BasicType value) : inner(std::move(value)) {}
+		explicit StackFrame(std::string name) : inner(std::move(name)) {}
 
-		const StackType& value() const {
-			return _value.value();
+		bool isVariable() const {
+			return std::holds_alternative<std::string>(inner);
 		}
 
-		StackType& value() {
-			return _value.value();
+		bool isValue() const {
+			return std::holds_alternative<base::BasicType>(inner);
 		}
 
-		void setValue(StackType value) {
-			_value = value;
+		const std::string& getName() const {
+			return std::get<std::string>(inner);
 		}
 
-		bool hasValue() const {
-			return _value.has_value();
+		const BasicType& getValue() const {
+			return std::get<base::BasicType>(inner);
 		}
 
-		Operator getOperator() const {
-			return _opCode;
+		BasicType& getValue() {
+			return std::get<base::BasicType>(inner);
 		}
 
-		bool isOperator(Operator op) const {
-			return getOperator() == op;
-		}
+		friend bool operator==(const StackFrame& a, const StackFrame& b) {
+			if (a.isValue() != b.isValue()) {
+				return false;
+			}
 
-		int priority() const {
-			return getPriority(_opCode);
-		}
-
-		bool operator<(const StackFrame& other) const {
-			return getPriority(_opCode) < getPriority(other.getOperator());
-		}
-
-		bool operator>(const StackFrame& other) const {
-			return getPriority(_opCode) > getPriority(other.getOperator());
-		}
-
-		bool operator==(const StackFrame& other) const {
-			return getOperator() == other.getOperator() and value() == other.value();
+			if (a.isValue()) {
+				return (a.getValue() == b.getValue()).getBool();
+			} else {
+				return a.getName() == b.getName();
+			}
 		}
 
 	private:
-		Operator _opCode;
-		std::optional<StackType> _value;
+		std::variant<BasicType, std::string> inner;
 	};
-}
+
+	std::string printStack(const std::list<base::StackFrame>& s) {
+		using namespace base;
+		std::ostringstream stream;
+
+		stream << "Stack:" << std::endl;
+		for (const auto& i : s) {
+			if (i.isValue()) {
+				stream << "\t" << i.getValue() << std::endl;
+			} else {
+				stream << "\t" << i.getName() << std::endl;
+			}
+		}
+
+		return stream.str();
+	}
+
+} // namespace base

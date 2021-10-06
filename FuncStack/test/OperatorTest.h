@@ -8,14 +8,14 @@ using namespace utils;
 using namespace stackmachine;
 
 namespace {
-	void test(Operator op, base::ValueType a, base::ValueType b, base::ValueType expected) {
+	void test(Operator op, base::BasicType a, base::BasicType b, base::BasicType expected) {
 		const std::string name = a.toString() + " " + getName(op) + " " + b.toString();
 		SECTION(name) {
 			try {
-				std::list<base::StackFrame> programm = {
-					StackFrame(Operator::LOAD, StackType(a)),
-					StackFrame(Operator::LOAD, StackType(b)),
-					StackFrame(op)
+				std::list<base::Operation> programm = {
+					Operation(Operator::LOAD, StackFrame(a)),
+					Operation(Operator::LOAD, StackFrame(b)),
+					Operation(op)
 				};
 
 				StackMachine machine(std::move(programm));
@@ -24,7 +24,7 @@ namespace {
 
 				const auto result = machine.exec();
 				REQUIRE(result.has_value());
-				REQUIRE((result.value() == expected).getBool());
+				REQUIRE((result.value().getValue() == expected).getBool());
 			} catch (const std::exception & e) {
 				FAIL(e.what());
 			}
@@ -33,8 +33,8 @@ namespace {
 }
 
 TEST_CASE("Operator-Test") {
-	test(Operator::ADD, base::ValueType(6), base::ValueType(2), base::ValueType(8));
-	test(Operator::SUB, base::ValueType(6), base::ValueType(2), base::ValueType(4));
-	test(Operator::MULT, base::ValueType(6), base::ValueType(2), base::ValueType(12));
-	test(Operator::DIV, base::ValueType(6), base::ValueType(2), base::ValueType(3));
+	test(Operator::ADD, base::BasicType(6), base::BasicType(2), base::BasicType(8));
+	test(Operator::SUB, base::BasicType(6), base::BasicType(2), base::BasicType(4));
+	test(Operator::MULT, base::BasicType(6), base::BasicType(2), base::BasicType(12));
+	test(Operator::DIV, base::BasicType(6), base::BasicType(2), base::BasicType(3));
 }

@@ -6,9 +6,12 @@
 #include <memory>
 
 namespace lexer {
+	/*
+	Class convertes code between braces into recursive nodes representing those braces
+	*/
 	class GroupOrganizer {
-		using it = std::vector<base::StackFrame>::const_iterator;
-		using OpStream = utils::Stream<base::StackFrame>;
+		using it = std::vector<base::Operation>::const_iterator;
+		using OpStream = utils::Stream<base::Operation>;
 
 		OpStream inputTokens;
 		std::vector<Node> outputNodes;
@@ -48,7 +51,7 @@ namespace lexer {
 			const auto _begin = inputTokens.pos();
 			unwind(open, close);
 
-			outputNodes.emplace_back(base::StackFrame(group), GroupOrganizer::run(OpStream(_begin, inputTokens.pos())));
+			outputNodes.emplace_back(base::Operation(group), GroupOrganizer::run(OpStream(_begin, inputTokens.pos())));
 			return true;
 		}
 
@@ -64,7 +67,7 @@ namespace lexer {
 
 	public:
 		static std::vector<Node> run(OpStream tokenStream) {
-			return GroupOrganizer(tokenStream).outputNodes;
+			return std::move(GroupOrganizer(tokenStream).outputNodes);
 		}
 	};
 }

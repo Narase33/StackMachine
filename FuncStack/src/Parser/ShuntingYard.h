@@ -13,15 +13,16 @@
 
 namespace parser {
 	class ShuntingYard {
-		std::stack<base::StackFrame> sideStack;
-		std::list<base::StackFrame> opStack;
-		utils::Stream<lexer::Node>& opStream;
+		std::stack<base::Operation> sideStack;
+		std::list<base::Operation> opStack;
+		const std::vector<lexer::Node>& _tokens;
+		std::vector<lexer::Node>::const_iterator _currentPos;
 
 		void assure_isOperator(const lexer::Node& node, base::Operator op) const {
 			ex::assure(node.is(op), "Node is "s + base::getName(node.getOperator()) + ", should be: " + base::getName(op));
 		}
 
-		void assure_isOperator(const base::StackFrame& opCode, base::Operator op) const {
+		void assure_isOperator(const base::Operation& opCode, base::Operator op) const {
 			ex::assure(opCode.getOperator() == op, "Node is "s + base::getName(opCode.getOperator()) + ", should be: " + base::getName(op));
 		}
 
@@ -31,12 +32,12 @@ namespace parser {
 		}
 
 		void insertParsed(lexer::Node&& source) {
-			const std::list<base::StackFrame> ops = ShuntingYard::run(source.getGroup());
+			const std::list<base::Operation> ops = ShuntingYard::run(source.getGroup());
 			opStack.insert(opStack.end(), ops.begin(), ops.end());
 		}
 
 		void parseSubGroup(base::Operator expectedOperator) {
-			lexer::Node next = opStream.peakAndNext();
+			lexer::Node next = *_currentPos++;
 			assure_isOperator(next, expectedOperator);
 			insertParsed(std::move(next));
 		}
@@ -45,32 +46,31 @@ namespace parser {
 			parseSubGroup(Operator::BRACE_GROUP);
 
 			const size_t jumpOverIndex = nextIndex();
-			opStack.emplace_back(Operator::JUMP_LABEL_IF, base::StackType(base::ValueType(jumpOverIndex))); // jump over if
+			opStack.emplace_back(Operator::JUMP_LABEL_IF, base::StackFrame(base::BasicType(jumpOverIndex))); // jump over if
 
 			parseSubGroup(Operator::BRACKET_GROUP);
 
-			opStack.emplace_back(Operator::JUMP_LABEL, base::StackType(base::ValueType(jumpToEndIndex))); // jump to end
-			opStack.emplace_back(Operator::LABEL, base::StackType(base::ValueType(jumpOverIndex))); // after if label
+			opStack.emplace_back(Operator::JUMP_LABEL, base::StackFrame(base::BasicType(jumpToEndIndex))); // jump to end
+			opStack.emplace_back(Operator::LABEL, base::StackFrame(base::BasicType(jumpOverIndex))); // after if label
 		}
 
 		void parse_if() {
 			const size_t jumpToEndIndex = nextIndex();
 			insert_if_base(jumpToEndIndex);
-			opStack.emplace_back(Operator::LABEL, base::StackType(base::ValueType(jumpToEndIndex))); // set end label
+			opStack.emplace_back(Operator::LABEL, base::StackFrame(base::BasicType(jumpToEndIndex))); // set end label
 		}
 
 		void parse_else() {
-			StackFrame jumpToEndLabel = opStack.back(); // retrieve 'else' end label
+			Operation jumpToEndLabel = opStack.back(); // retrieve 'else' end label
 			assure_isOperator(jumpToEndLabel, Operator::LABEL);
 			opStack.pop_back();
 
-			if (opStream->is(Operator::IF)) {
-				opStream.next();
+			if (_currentPos->is(Operator::IF)) {
+				_currentPos++;
 
-				const int jumpToEndIndex = jumpToEndLabel.value().getValue().getUnsigned();
+				const size_t jumpToEndIndex = jumpToEndLabel.getStackFrame(0).getValue().getUint();
 				insert_if_base(jumpToEndIndex);
-			}
-			else {
+			} else {
 				parseSubGroup(Operator::BRACKET_GROUP);
 			}
 
@@ -78,11 +78,11 @@ namespace parser {
 		}
 
 		void shuntingYardIteration(lexer::Node&& op) {
-			while (!sideStack.empty() and (sideStack.top().priority() >= op.getStackFrame().priority())) {
+			while (!sideStack.empty() and (sideStack.top().priority() >= op.getOperation().priority())) {
 				opStack.push_back(sideStack.top());
 				sideStack.pop();
 			}
-			sideStack.push(op.getStackFrame());
+			sideStack.push(op.getOperation());
 		}
 
 		void flushSideStack() {
@@ -92,17 +92,33 @@ namespace parser {
 			}
 		}
 
-		ShuntingYard(utils::Stream<lexer::Node> opStream) : opStream(opStream) {
+		ShuntingYard(const std::vector<lexer::Node>& tokens) : _tokens(tokens) {
 			using namespace base;
 
-			while (!opStream.isEnd()) {
-				auto op = opStream.peakAndNext();
+			const auto equalIt = std::find_if(tokens.begin(), tokens.end(), [](const lexer::Node& n) {
+				return n.getOperator() == Operator::STORE;
+			});
+
+			while (_currentPos != _tokens.end()) {
+				auto op = *_currentPos++;
 				switch (op.getOperator()) {
-					case Operator::LOAD: opStack.push_back(op.getStackFrame()); break;
-					case Operator::IF: parse_if(); break;
-					case Operator::ELSE: parse_else(); break;
-					case Operator::BRACE_GROUP: insertParsed(std::move(op)); break;
-					case Operator::BRACKET_GROUP: insertParsed(std::move(op)); break;
+					case Operator::LOAD:
+						opStack.push_back(op.getOperation());
+						break;
+					case Operator::IF:
+						parse_if();
+						break;
+					case Operator::ELSE:
+						parse_else();
+						break;
+					case Operator::BRACE_GROUP:
+						insertParsed(std::move(op));
+						break;
+					case Operator::BRACKET_GROUP:
+						opStack.push_back(Operation(Operator::BRACKET_OPEN));
+						insertParsed(std::move(op));
+						opStack.push_back(Operation(Operator::BRACKET_CLOSE));
+						break;
 					default: shuntingYardIteration(std::move(op));
 				}
 			}
@@ -111,8 +127,8 @@ namespace parser {
 		}
 
 	public:
-		static std::list<base::StackFrame> run(utils::Stream<lexer::Node> opStream) {
-			return ShuntingYard(opStream).opStack;
+		static std::list<base::Operation> run(const std::vector<lexer::Node>& tokens) {
+			return std::move(ShuntingYard(tokens).opStack);
 		}
 	};
 } // namespace parser

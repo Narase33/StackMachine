@@ -3,32 +3,56 @@
 #include <memory>
 #include <map>
 
-#include "src/Base/StackFrame.h"
+#include "src/Base/Operation.h"
 
 class Scope {
 public:
-	Scope(Scope* parent) : _parent(parent) {
-		// empty
+	Scope() {
+		newScope();
 	}
 
-	std::optional<base::ValueType> get(const std::string& name) const {
-		const auto pos = _variables.find(name);
-		if (pos != _variables.end()) {
-			return pos->second;
-		}
-
-		if (_parent != nullptr) {
-			return _parent->get(name);
-		}
-
-		return {};
+	void newScope() {
+		_variables.emplace_back();
 	}
 
-	void add(const std::string& name, base::ValueType value) {
-		_variables[name] = value;
+	void leaveScope() {
+		_variables.pop_back();
+	}
+
+	base::BasicType* get(const std::string& name) {
+		for (auto it = _variables.rbegin(); it != _variables.rend(); it++) {
+			auto _pos = it->find(name);
+			if (_pos != it->end()) {
+				return &(_pos->second);
+			}
+		}
+
+		throw ex::Exception("Variable not defined: " + name);
+	}
+
+	const base::BasicType* get(const std::string& name) const {
+		for (auto it = _variables.rbegin(); it != _variables.rend(); it++) {
+			const auto _pos = it->find(name);
+			if (_pos != it->end()) {
+				return &(_pos->second);
+			}
+		}
+
+		throw ex::Exception("Variable not defined: " + name);
+	}
+
+	void add(const std::string& name, base::BasicType value) {
+		auto variableIt = _variables.back().find(name);
+		ex::assure(variableIt == _variables.back().end(), "Variable already defined in this scope: " + name);
+		_variables.back()[name] = std::move(value);
+	}
+
+	void set(const std::string& name, base::BasicType value) {
+		base::BasicType* variable = get(name);
+		ex::assure(value.typeId() == variable->typeId(), "Variables have different types: " + variable->toString() + " <- " + value.toString());
+		*variable = std::move(value);
 	}
 
 private:
-	std::map<std::string, base::ValueType> _variables;
-	Scope* _parent;
+	std::vector<std::map<std::string, base::BasicType>> _variables;
 };

@@ -6,46 +6,60 @@
 #include <optional>
 #include <sstream>
 
-#include "src/Base/StackType.h"
-#include "src/Base/OperatorAttributes.h"
 #include "src/Base/StackFrame.h"
+#include "src/Base/OperatorAttributes.h"
+#include "src/Base/Operation.h"
 
 namespace {
 	using stringConstIterator = std::string::const_iterator;
-	using ExtractorResult = std::optional<base::StackFrame>;
+	using ExtractorResult = std::optional<base::Operation>;
 
 	class SourceStream {
 		const std::string& source;
-		stringConstIterator pos;
-		stringConstIterator saved_pos;
+		stringConstIterator _pos;
+		stringConstIterator _saved_pos;
 
 	public:
 		SourceStream(const std::string& source) : source(source) {
-			pos = this->source.begin();
+			_pos = this->source.begin();
 		}
 
 		bool isEnd() const {
-			return pos == source.end();
+			return _pos == source.end();
 		}
 
 		bool is(char c) const {
-			return !isEnd() and (*pos == c); 
+			return !isEnd() and (*_pos == c);
 		}
 
 		char peak() const {
-			return *pos;
+			return *_pos;
 		}
 
 		char pop() {
-			return *pos++;
+			return *_pos++;
 		}
 
-		void save() { 
-			saved_pos = pos; 
+		void save() {
+			_saved_pos = _pos;
 		}
 
-		void rewind() { 
-			pos = saved_pos; 
+		stringConstIterator pos() {
+			return _pos;
+		}
+
+		void rewind() {
+			rewind(_saved_pos);
+		}
+
+		void rewind(stringConstIterator pos) {
+			_pos = pos;
+		}
+
+		void skipWhiteSpace() {
+			while (!isEnd() and std::isspace(*_pos)) {
+				pop();
+			}
 		}
 	};
 
@@ -61,6 +75,16 @@ namespace {
 			}
 			return currentToken;
 		}
+
+		std::string extractUntilWhitespace(SourceStream& stream) const {
+			return extractLexem(stream, [](char c) {
+				return !std::isspace(c);
+			});
+		}
+
+		const std::function<bool(char c)> variableNameRecognizer = [](char c) -> bool {
+			return std::isalpha(c) or (c == '_');
+		};
 	};
 
 	class Extractor_Operator : public Extractor {
@@ -68,7 +92,7 @@ namespace {
 		ExtractorResult extract(SourceStream& stream) const override {
 			if (!stream.isEnd()) {
 				stream.save();
-				const int maxSize = base::maxSize();
+				const size_t maxSize = base::maxSize();
 
 				std::string op;
 				op.reserve(maxSize);
@@ -85,7 +109,7 @@ namespace {
 
 				stream.rewind();
 				if (!validated.empty()) {
-					return base::StackFrame(base::fromSymbol(validated.c_str()).op);
+					return base::Operation(base::fromSymbol(validated.c_str()).op);
 				}
 			}
 			return {};
@@ -96,17 +120,24 @@ namespace {
 	public:
 		ExtractorResult extract(SourceStream& stream) const override {
 			if (!stream.isEnd()) {
-				auto recognizer = [](char c) {return std::isalpha(c) or (c == '_'); };
-				if (recognizer(stream.peak())) {
-					const std::string lexem = extractLexem(stream, recognizer);
+				if (variableNameRecognizer(stream.peak())) {
+					const std::string lexem = extractLexem(stream, variableNameRecognizer);
 
 					if ((lexem == "true") or (lexem == "false")) {
-						return base::StackFrame(base::Operator::LOAD, base::StackType(base::ValueType(lexem == "true"))); // Literal Bool
-					} else if (base::isSymbol(lexem.c_str())) {
-						return base::StackFrame(base::fromSymbol(lexem.c_str()).op); // Type Keyword
-					} else {
-						return base::StackFrame(base::Operator::LOAD, base::StackType(lexem)); // Name
+						return base::Operation(base::Operator::LOAD, base::StackFrame(base::BasicType(lexem == "true"))); // Literal Bool
 					}
+
+					if (base::isSymbol(lexem.c_str())) {
+						return base::Operation(base::fromSymbol(lexem.c_str()).op); // Type Keyword
+					}
+
+					const size_t variableTypeId = base::BasicType::stringToId(lexem);
+					if (variableTypeId != -1) {
+						base::BasicType type = BasicType::idToType(variableTypeId);
+						return base::Operation(base::Operator::CREATE, base::StackFrame(std::move(type)));
+					}
+
+					return base::Operation(base::Operator::LOAD, base::StackFrame(lexem)); // Name
 				}
 			}
 
@@ -126,12 +157,12 @@ namespace {
 
 					if (isDigit(stream)) {
 						currentToken += '.' + extractNumber(stream);
-						base::ValueType value(std::stold(currentToken));
-						return base::StackFrame(base::Operator::LOAD, base::StackType(std::move(value))); // Literal Double
+						base::BasicType value(std::stold(currentToken));
+						return base::Operation(base::Operator::LOAD, base::StackFrame(std::move(value))); // Literal Double
 					}
 					stream.rewind();
 				}
-				return base::StackFrame(base::Operator::LOAD, base::StackType(base::ValueType(std::stoll(currentToken)))); // Literal Long
+				return base::Operation(base::Operator::LOAD, base::StackFrame(base::BasicType(std::stoll(currentToken)))); // Literal Long
 			}
 			return {};
 		}
@@ -152,31 +183,43 @@ namespace {
 }
 
 namespace lexer {
-	std::vector<base::StackFrame> tokenize(const std::string& expression) {
-		std::vector<base::StackFrame> out;
-		SourceStream stream(expression);
+	class Tokenizer {
+		void runExtractors(SourceStream& stream) {
+			static const std::initializer_list<Extractor*> extractors = {
+				new Extractor_Operator(),
+				new Extractor_NumberLiteral(),
+				new Extractor_Name(),
+			};
 
-		static const std::initializer_list<Extractor*> extractors = {
-			new Extractor_Operator(),
-			new Extractor_NumberLiteral(),
-			new Extractor_Name(),
-		};
-
-		while (!stream.isEnd()) {
-			if (std::isspace(stream.peak())) {
-				stream.pop();
-				continue;
-			}
-
-			for (const auto& i : extractors) {
-				const std::optional<base::StackFrame> result = i->extract(stream);
+			for (Extractor* i : extractors) {
+				const std::optional<base::Operation> result = i->extract(stream);
 				if (result.has_value()) {
-					out.push_back(result.value());
-					continue;
+					tokens.push_back(result.value());
+					return;
 				}
+			}
+			throw ex::Exception("Unknown token: ");
+		}
+
+		Tokenizer(const std::string& expression) {
+			SourceStream stream(expression);
+
+			while (!stream.isEnd()) {
+				stream.skipWhiteSpace();
+
+				if (stream.isEnd()) {
+					return;
+				}
+
+				runExtractors(stream);
 			}
 		}
 
-		return out;
-	}
+		std::vector<base::Operation> tokens;
+
+	public:
+		static std::vector<base::Operation> run(const std::string& expression) {
+			return std::move(Tokenizer(expression).tokens);
+		}
+	};
 }
