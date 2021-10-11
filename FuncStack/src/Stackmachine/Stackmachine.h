@@ -12,10 +12,10 @@
 namespace stackmachine {
 	class StackMachine {
 	public:
-		StackMachine(std::list<base::Operation> toExecute) {
+		StackMachine(const std::list<base::Operation>& toExecute) {
 			programm.reserve(toExecute.size() + 1);
-			std::move(toExecute.begin(), toExecute.end(), std::back_inserter(programm));
-			programm.push_back(base::Operation(base::Operator::END));
+			std::copy(toExecute.begin(), toExecute.end(), std::back_inserter(programm));
+			programm.push_back(base::Operation(OpCode::END_PROGRAM));
 			pc = programm.begin();
 		}
 
@@ -25,6 +25,10 @@ namespace stackmachine {
 
 		void set(const std::string& variableName, base::BasicType variableValue) {
 			variables.set(variableName, variableValue);
+		}
+
+		base::BasicType get(const std::string& variableName) const {
+			return *variables.get(variableName);
 		}
 
 		size_t size() const {
@@ -38,7 +42,7 @@ namespace stackmachine {
 				}
 			}*/
 
-			while ((pc->getOperator() != base::Operator::END) && (pc != programm.end())) {
+			while (pc->getOpCode() != OpCode::END_PROGRAM) {
 				execNext();
 				pc++;
 			}
@@ -52,29 +56,31 @@ namespace stackmachine {
 			stream << "Programm:" << std::endl;
 			for (const base::Operation& i : programm) {
 				std::string opValue;
-				if (i.hasStackFrame(0)) {
-					const base::StackFrame& value = i.getStackFrame(0);
-					opValue = " " + (value.isVariable() ? value.getName() : value.getValue().toString());
-				}
 
-				stream << "\t" << getName(i.getOperator()) << opValue << std::endl;
+				const base::StackFrame& value1 = i.firstValue();
+				opValue = " " + (value1.isVariable() ? value1.getName() : value1.getValue().toString());
+
+				const base::StackFrame& value2 = i.secondValue();
+				opValue += " " + (value2.isVariable() ? value2.getName() : value2.getValue().toString());
+
+				stream << "\t" << opCodeName(i.getOpCode()) << opValue << std::endl;
 			}
 
 			return stream.str();
 		}
 
-		std::stack<base::StackFrame> getDataStack() const {
+		std::stack<base::BasicType> getDataStack() const {
 			return dataStack;
 		}
 
 	private:
 		Scope variables;
-		std::stack<base::StackFrame> dataStack;
+		std::stack<base::BasicType> dataStack;
 		std::vector<base::Operation> programm;
 		std::vector<base::Operation>::const_iterator pc;
 
-		base::StackFrame pop() {
-			base::StackFrame data = dataStack.top();
+		base::BasicType pop() {
+			base::BasicType data = dataStack.top();
 			dataStack.pop();
 			return data;
 		}
@@ -84,82 +90,78 @@ namespace stackmachine {
 		}
 
 		void execNext() {
-			switch (pc->getOperator()) {
-				case base::Operator::END:
+			switch (pc->getOpCode()) {
+				case OpCode::LOAD:
+					dataStack.push(resolve(pc->firstValue()));
 					break;
-				case base::Operator::LOAD:
-					dataStack.push(pc->getStackFrame(0));
-					break;
-				case base::Operator::STORE:
+				case OpCode::STORE:
 				{
-					const base::StackFrame variableValue = pop();
-					const base::StackFrame variableName = pop();
-					variables.set(variableName.getName(), resolve(variableValue));
+					base::BasicType variableValue = pop();
+					variables.set(pc->firstValue().getName(), std::move(variableValue));
 				}
-					break;
-				case base::Operator::CREATE:
+				break;
+				case OpCode::CREATE:
 				{
-					const base::StackFrame variableType = pop();
-					const base::StackFrame variableName = pop();
-					const sm_uint typeId = variableType.getValue().getUint();
-					variables.add(variableName.getName(), base::BasicType::idToType(typeId));
+					const sm_uint typeId = pc->firstValue().getValue().getUint();
+					const std::string& variableName = pc->secondValue().getName();
+					variables.add(variableName, base::BasicType::idToType(typeId));
 				}
-					break;
-				case base::Operator::POP:
+				break;
+				case OpCode::POP:
 					pop();
 					break;
-				case base::Operator::INCR:
+				case OpCode::INCR:
 					executeOP(std::plus(), base::BasicType(1));
 					break;
-				case base::Operator::DECR:
+				case OpCode::DECR:
 					executeOP(std::minus(), base::BasicType(1));
 					break;
-				case base::Operator::EQ:
+				case OpCode::EQ:
 					executeOP(std::equal_to());
 					break;
-				case base::Operator::UNEQ:
+				case OpCode::UNEQ:
 					executeOP(std::not_equal_to());
 					break;
-				case base::Operator::ADD:
+				case OpCode::ADD:
 					executeOP(std::plus());
 					break;
-				case base::Operator::SUB:
+				case OpCode::SUB:
 					executeOP(std::minus());
 					break;
-				case base::Operator::MULT:
+				case OpCode::MULT:
 					executeOP(std::multiplies());
 					break;
-				case base::Operator::DIV:
+				case OpCode::DIV:
 					executeOP(std::divides());
 					break;
-				case base::Operator::JUMP:
-					pc += pc->getStackFrame(0).getValue().getInt() - 1; // loop will increment +1
+				case OpCode::JUMP:
+					pc += pc->firstValue().getValue().getInt() - 1; // loop will increment +1
 					break;
-				case base::Operator::JUMP_IF:
-					if (pop().getValue().getBool() == false) {
-						pc += pc->getStackFrame(0).getValue().getInt() - 1; // loop will increment +1
+				case OpCode::JUMP_IF:
+					if (pop().getBool() == false) {
+						pc += pc->firstValue().getValue().getInt() - 1; // loop will increment +1
 					}
 					break;
-				case base::Operator::BRACKET_OPEN:
+				case OpCode::BRACKET_CURLY_OPEN:
 					variables.newScope();
 					break;
-				case base::Operator::BRACKET_CLOSE:
+				case OpCode::BRACKET_CURLY_CLOSE:
 					variables.leaveScope();
 					break;
 				default:
-					throw ex::Exception("Unrecognized token: "s + base::getName(pc->getOperator()));
+					throw ex::Exception("Unrecognized token: "s + opCodeName(pc->getOpCode()));
 			}
 		}
 
 		void executeOP(std::function<base::BasicType(const base::BasicType& a, const base::BasicType& b)> func) {
-			const base::StackFrame a = pop();
-			const base::StackFrame b = pop();
-			dataStack.emplace(func(resolve(b), resolve(a)));
+			const base::BasicType a = pop();
+			const base::BasicType b = pop();
+			dataStack.emplace(func(b, a));
 		}
 
 		void executeOP(std::function<base::BasicType(const base::BasicType& a, const base::BasicType& b)> func, const base::BasicType& operand) {
-			const base::StackFrame a = pop();
-			dataStack.emplace(func(resolve(a), operand));
+			const base::BasicType a = pop();
+			dataStack.emplace(func(a, operand));
 		}
 	};
 }

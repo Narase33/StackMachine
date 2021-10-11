@@ -1,24 +1,24 @@
 #pragma once
 
 #include "catch.hpp"
-#include "src/Stackmachine/Stackmachine.h"
+#include "../src/Stackmachine/Stackmachine.h"
 
 using namespace base;
 using namespace utils;
 using namespace stackmachine;
 
 namespace {
-	void test(Operator op, base::BasicType a, base::BasicType b, base::BasicType expected) {
-		const std::string name = a.toString() + " " + getName(op) + " " + b.toString();
+	void test(OpCode op, base::BasicType a, base::BasicType b, base::BasicType expected) {
+		const std::string name = a.toString() + " " + opCodeName(op) + " " + b.toString();
 		SECTION(name) {
 			try {
-				std::list<base::Operation> programm = {
-					Operation(Operator::LOAD, StackFrame(a)),
-					Operation(Operator::LOAD, StackFrame(b)),
+				const std::list<base::Operation> programm = {
+					Operation(OpCode::LOAD, StackFrame(a)),
+					Operation(OpCode::LOAD, StackFrame(b)),
 					Operation(op)
 				};
 
-				StackMachine machine(std::move(programm));
+				StackMachine machine(programm);
 
 				INFO(machine.toString());
 
@@ -33,8 +33,8 @@ namespace {
 }
 
 TEST_CASE("Operator-Test") {
-	test(Operator::ADD, base::BasicType(6), base::BasicType(2), base::BasicType(8));
-	test(Operator::SUB, base::BasicType(6), base::BasicType(2), base::BasicType(4));
-	test(Operator::MULT, base::BasicType(6), base::BasicType(2), base::BasicType(12));
-	test(Operator::DIV, base::BasicType(6), base::BasicType(2), base::BasicType(3));
+	test(OpCode::ADD, base::BasicType(6), base::BasicType(2), base::BasicType(8));
+	test(OpCode::SUB, base::BasicType(6), base::BasicType(2), base::BasicType(4));
+	test(OpCode::MULT, base::BasicType(6), base::BasicType(2), base::BasicType(12));
+	test(OpCode::DIV, base::BasicType(6), base::BasicType(2), base::BasicType(3));
 }

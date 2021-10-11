@@ -5,39 +5,40 @@
 #include "src/Base/Operation.h"
 #include "src/Utils/Utils.h"
 #include "src/Exception.h"
+#include "Token.h"
 
 namespace lexer {
 	class Node {
-		base::Operation op;
+		Token token;
 		std::vector<Node> group;
 
 	public:
-		Node(base::Operation op)
-			: op(std::move(op)) {
+		Node(Token op)
+			: token(std::move(op)) {
 		}
 
-		Node(base::Operation op, std::vector<Node> group)
-			: op(std::move(op)), group(std::move(group)) {
-			ex::assure(isGroup(), "Got non-group StackFrame");
+		Node(Token op, std::vector<Node> group)
+			: token(std::move(op)), group(std::move(group)) {
+			ex::assume(isGroup(), "Got non-group Token");
 		}
 
-		const base::Operation& getOperation() const {
-			return op;
+		const Token& getToken() const {
+			return token;
 		}
 
-		base::Operator getOperator() const {
-			return op.getOperator();
+		OpCode getOpCode() const {
+			return token.id;
 		}
 
 		bool isGroup() const {
-			return utils::any_of(op.getOperator(), { base::Operator::BRACE_GROUP, base::Operator::BRACKET_GROUP });
+			return utils::any_of(token.id, { OpCode::BRACKET_ROUND_OPEN, OpCode::BRACKET_CURLY_OPEN });
 		}
 
-		bool is(base::Operator op) const {
-			return this->op.isOperator(op);
+		bool is(OpCode id) const {
+			return token.id == id;
 		}
 
-		std::vector<Node> getGroup() const {
+		const std::vector<Node>& getGroup() const {
 			return group;
 		}
 	};

@@ -10,64 +10,92 @@ namespace lexer {
 	Class convertes code between braces into recursive nodes representing those braces
 	*/
 	class GroupOrganizer {
-		using it = std::vector<base::Operation>::const_iterator;
-		using OpStream = utils::Stream<base::Operation>;
+		using Iterator = std::vector<Token>::const_iterator;
 
-		OpStream inputTokens;
+		const Source& source;
+		Iterator current;
+		const Iterator end;
+		const Iterator begin;
+
 		std::vector<Node> outputNodes;
+		bool success = true;
 
-		void unwind(base::Operator open, base::Operator close) {
+		void assume(bool condition, const std::string& message, size_t pos) const {
+			if (!condition) {
+				throw ex::ParserException(message, pos);
+			}
+		}
+
+		void jumpToOpposingBracket(OpCode open, OpCode close) {
+			const Iterator origin = current;
+
 			int openGroups = 1;
-			while ((openGroups > 0) and !inputTokens.isEnd()) {
-				if (inputTokens->isOperator(open))
+			while (openGroups > 0) {
+				assume(current != end, "Missing closing bracket", origin->pos);
+
+				if (current->id == open)
 					openGroups++;
 
-				if (inputTokens->isOperator(close))
+				if (current->id == close)
 					openGroups--;
 
-				inputTokens.next();
+				current++;
 			}
-			inputTokens.prev();
+			current--;
 		}
 
 		bool extractGroup() {
-			base::Operator open = base::Operator::NONE;
-			base::Operator close = base::Operator::NONE;
-			base::Operator group = base::Operator::NONE;
+			OpCode open = OpCode::ERR;
+			OpCode close = OpCode::ERR;
 
-			if (inputTokens->isOperator(base::Operator::BRACE_OPEN)) {
-				std::tie(open, close) = FromGroupBrace(base::Operator::BRACE_GROUP);
-				group = base::Operator::BRACE_GROUP;
-			}
-			else if (inputTokens->isOperator(base::Operator::BRACKET_OPEN)) {
-				std::tie(open, close) = FromGroupBrace(base::Operator::BRACKET_GROUP);
-				group = base::Operator::BRACKET_GROUP;
-			}
-			else {
+			if (current->id == OpCode::BRACKET_ROUND_OPEN) {
+				open = OpCode::BRACKET_ROUND_OPEN;
+				close = OpCode::BRACKET_ROUND_CLOSE;
+			} else if (current->id == OpCode::BRACKET_CURLY_OPEN) {
+				open = OpCode::BRACKET_CURLY_OPEN;
+				close = OpCode::BRACKET_CURLY_CLOSE;
+			} else {
 				return false;
 			}
 
-			inputTokens.next();
-			const auto _begin = inputTokens.pos();
-			unwind(open, close);
+			Token groupToken = *current;
 
-			outputNodes.emplace_back(base::Operation(group), GroupOrganizer::run(OpStream(_begin, inputTokens.pos())));
+			current++;
+			const Iterator begin = current;
+			jumpToOpposingBracket(open, close);
+
+			GroupOrganizer organizer(begin, current, source);
+			outputNodes.push_back(lexer::Node(std::move(groupToken), organizer.run()));
 			return true;
 		}
 
-		GroupOrganizer(OpStream tokenStream) : inputTokens(tokenStream) {
-			while (!inputTokens.isEnd()) {
-				const bool success = extractGroup();
-				if (!success) {
-					outputNodes.emplace_back(inputTokens.peak());
-				}
-				inputTokens.next();
-			}
+	public:
+		bool isSuccess() const {
+			return success;
+		}
+		
+		GroupOrganizer(Iterator begin, Iterator end, const Source& source) :
+			begin(begin), current(begin), end(end), source(source) {
 		}
 
-	public:
-		static std::vector<Node> run(OpStream tokenStream) {
-			return std::move(GroupOrganizer(tokenStream).outputNodes);
+		GroupOrganizer(const std::vector<Token>& nodes, const Source& source) :
+			begin(nodes.begin()), current(nodes.begin()), end(nodes.end()), source(source) {
+		}
+
+		std::vector<Node> run() {
+			try {
+				while (current != end) {
+					const bool success = extractGroup();
+					if (!success) {
+						outputNodes.push_back(lexer::Node(*current));
+					}
+					current++;
+				}
+			} catch (const ex::ParserException& ex) {
+				std::cout << ex.what() << "\n" << source.markedLineAt(ex.getPos()) << std::endl;
+			}
+
+			return std::move(outputNodes);
 		}
 	};
 }

@@ -1,67 +1,49 @@
 #pragma once
 
-#include "OperatorAttributes.h"
+#include "OpCode.h"
+#include "StackFrame.h"
 
 namespace base {
-	struct Operation {
-		explicit Operation(Operator opCode, StackFrame value_a, StackFrame value_b) :
-			_opCode(opCode), _value{ std::move(value_a), std::move(value_b) } {
+	struct Operation final {
+		explicit Operation(OpCode opCode, StackFrame value1, StackFrame value2) :
+			_opCode(opCode), _value1(std::move(value1)), _value2(std::move(value2)) {
 		}
 
-		explicit Operation(Operator opCode, StackFrame value) :
-			_opCode(opCode), _value{ std::move(value), std::nullopt } {
+		explicit Operation(OpCode opCode, StackFrame value) :
+			_opCode(opCode), _value1(std::move(value)), _value2("") {
 		}
 
-		explicit Operation(Operator opCode)
-			: _opCode(opCode), _value{ std::nullopt, std::nullopt } {
+		explicit Operation(OpCode opCode) :
+			_opCode(opCode), _value1(""), _value2("") {
 		}
 
-		explicit Operation()
-			: _opCode(Operator::ERR), _value{ std::nullopt, std::nullopt } {
+		explicit Operation() :
+			_opCode(OpCode::ERR), _value1(""), _value2("") {
 		}
 
-		const StackFrame& getStackFrame(size_t index) const {
-			return _value[index].value();
+		const StackFrame& firstValue() const {
+			return _value1;
 		}
 
-		StackFrame& getStackFrame(size_t index) {
-			return _value[index].value();
+		StackFrame& firstValue() {
+			return _value1;
 		}
 
-		void setStackFrame(size_t index, StackFrame value) {
-			_value[index] = value;
+		const StackFrame& secondValue() const {
+			return _value2;
 		}
 
-		bool hasStackFrame(size_t index) const {
-			return _value[index].has_value();
+		StackFrame& secondValue() {
+			return _value2;
 		}
 
-		Operator getOperator() const {
+		OpCode getOpCode() const {
 			return _opCode;
 		}
 
-		bool isOperator(Operator op) const {
-			return getOperator() == op;
-		}
-
-		int priority() const {
-			return getPriority(_opCode);
-		}
-
-		bool operator<(const Operation& other) const {
-			return getPriority(_opCode) < getPriority(other.getOperator());
-		}
-
-		bool operator>(const Operation& other) const {
-			return getPriority(_opCode) > getPriority(other.getOperator());
-		}
-
-		bool operator==(const Operation& other) const {
-			return (getOperator() == other.getOperator()) and (getStackFrame(0) == other.getStackFrame(0) and (getStackFrame(1) == other.getStackFrame(1)));
-		}
-
 	private:
-		Operator _opCode;
-		std::optional<StackFrame> _value[2];
+		OpCode _opCode;
+		StackFrame _value1;
+		StackFrame _value2;
 	};
 }

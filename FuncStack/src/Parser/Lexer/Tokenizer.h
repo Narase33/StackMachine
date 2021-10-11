@@ -6,220 +6,229 @@
 #include <optional>
 #include <sstream>
 
-#include "src/Base/StackFrame.h"
-#include "src/Base/OperatorAttributes.h"
-#include "src/Base/Operation.h"
+#include "Token.h"
 
 namespace {
-	using stringConstIterator = std::string::const_iterator;
-	using ExtractorResult = std::optional<base::Operation>;
+	using Iterator = std::string::const_iterator;
+	using ExtractorResult = std::optional<Token>;
 
-	class SourceStream {
-		const std::string& source;
-		stringConstIterator _pos;
-		stringConstIterator _saved_pos;
-
-	public:
-		SourceStream(const std::string& source) : source(source) {
-			_pos = this->source.begin();
+	void skipWhitespace(Iterator& current, Iterator end) {
+		while ((current != end) and std::isspace(*current)) {
+			current++;
 		}
+	}
 
-		bool isEnd() const {
-			return _pos == source.end();
-		}
-
-		bool is(char c) const {
-			return !isEnd() and (*_pos == c);
-		}
-
-		char peak() const {
-			return *_pos;
-		}
-
-		char pop() {
-			return *_pos++;
-		}
-
-		void save() {
-			_saved_pos = _pos;
-		}
-
-		stringConstIterator pos() {
-			return _pos;
-		}
-
-		void rewind() {
-			rewind(_saved_pos);
-		}
-
-		void rewind(stringConstIterator pos) {
-			_pos = pos;
-		}
-
-		void skipWhiteSpace() {
-			while (!isEnd() and std::isspace(*_pos)) {
-				pop();
-			}
-		}
+	bool partOfVariableName(char c) {
+		return std::isalpha(c) or (c == '_');
 	};
 
 	class Extractor {
 	public:
-		virtual ExtractorResult extract(SourceStream& stream) const = 0;
+		Extractor(Iterator& begin, Iterator end) :
+			begin(begin), current(begin), end(end) {
+		}
+
+		virtual ExtractorResult extract() const = 0;
 
 	protected:
-		std::string extractLexem(SourceStream& stream, std::function<bool(char)> recognizer) const {
+		Iterator& current;
+		const Iterator end;
+		const Iterator begin;
+
+		std::string extractLexem(std::function<bool(char)> recognizer) const {
 			std::string currentToken;
-			while (!stream.isEnd() && recognizer(stream.peak())) {
-				currentToken += stream.pop();
+			while (!isEnd() && recognizer(*current)) {
+				currentToken += *current++;
 			}
 			return currentToken;
 		}
 
-		std::string extractUntilWhitespace(SourceStream& stream) const {
-			return extractLexem(stream, [](char c) {
+		std::string extractUntilWhitespace() const {
+			return extractLexem([](char c) {
 				return !std::isspace(c);
 			});
 		}
 
-		const std::function<bool(char c)> variableNameRecognizer = [](char c) -> bool {
-			return std::isalpha(c) or (c == '_');
-		};
+		bool isEnd() const {
+			return current == end;
+		}
+
+		size_t pos() const {
+			return std::distance(begin, current);
+		}
 	};
 
 	class Extractor_Operator : public Extractor {
 	public:
-		ExtractorResult extract(SourceStream& stream) const override {
-			if (!stream.isEnd()) {
-				stream.save();
-				const size_t maxSize = base::maxSize();
+		using Extractor::Extractor;
 
-				std::string op;
-				op.reserve(maxSize);
-				std::string validated;
+		ExtractorResult extract() const override {
+			const Iterator save = current;
 
-				for (int i = 0; i < maxSize and !stream.isEnd(); i++) {
-					op += stream.pop();
-
-					if (base::isSymbol(op.c_str())) {
-						validated = op;
-						stream.save();
+			if (!isEnd()) {
+				if ((current + 1) != end) {
+					const std::string_view op(current, current + 2);
+					const OpCode symbol = opCodeFromSymbol(op);
+					if (symbol != OpCode::ERR) {
+						current += 2;
+						return Token(symbol, pos());
 					}
 				}
 
-				stream.rewind();
-				if (!validated.empty()) {
-					return base::Operation(base::fromSymbol(validated.c_str()).op);
+				const std::string_view op(current, current + 1);
+				const OpCode symbol = opCodeFromSymbol(op);
+				if (symbol != OpCode::ERR) {
+					current += 1;
+					return Token(symbol, pos());
 				}
 			}
+
+			current = save;
 			return {};
 		}
 	};
 
 	class Extractor_Name : public Extractor {
 	public:
-		ExtractorResult extract(SourceStream& stream) const override {
-			if (!stream.isEnd()) {
-				if (variableNameRecognizer(stream.peak())) {
-					const std::string lexem = extractLexem(stream, variableNameRecognizer);
+		using Extractor::Extractor;
 
-					if ((lexem == "true") or (lexem == "false")) {
-						return base::Operation(base::Operator::LOAD, base::StackFrame(base::BasicType(lexem == "true"))); // Literal Bool
-					}
+		ExtractorResult extract() const override {
+			const Iterator save = current;
 
-					if (base::isSymbol(lexem.c_str())) {
-						return base::Operation(base::fromSymbol(lexem.c_str()).op); // Type Keyword
-					}
+			if (!isEnd() and (partOfVariableName(*current))) {
+				const std::string lexem = extractLexem(partOfVariableName);
 
-					const size_t variableTypeId = base::BasicType::stringToId(lexem);
-					if (variableTypeId != -1) {
-						base::BasicType type = BasicType::idToType(variableTypeId);
-						return base::Operation(base::Operator::CREATE, base::StackFrame(std::move(type)));
-					}
-
-					return base::Operation(base::Operator::LOAD, base::StackFrame(lexem)); // Name
+				if ((lexem == "true") or (lexem == "false")) {
+					return Token(OpCode::LITERAL, lexem == "true", pos()); // Literal Bool
 				}
+
+				const OpCode symbol = opCodeFromKeyword(lexem);
+				if (symbol != OpCode::ERR) {
+					return Token(symbol, pos()); // Type Keyword
+				}
+
+				const size_t variableTypeId = base::BasicType::stringToId(lexem);
+				if (variableTypeId != -1) {
+					return Token(OpCode::TYPE, variableTypeId, pos());
+				}
+
+				return Token(OpCode::NAME, lexem, pos()); // Name
 			}
 
+			current = save;
 			return {};
 		}
 	};
 
 	class Extractor_NumberLiteral : public Extractor {
 	public:
-		ExtractorResult extract(SourceStream& stream) const override {
-			if (isDigit(stream)) {
-				std::string currentToken = extractNumber(stream);
+		using Extractor::Extractor;
 
-				if (stream.is('.')) {
-					stream.save();
-					stream.pop();
+		ExtractorResult extract() const override {
+			Iterator save = current;
 
-					if (isDigit(stream)) {
-						currentToken += '.' + extractNumber(stream);
-						base::BasicType value(std::stold(currentToken));
-						return base::Operation(base::Operator::LOAD, base::StackFrame(std::move(value))); // Literal Double
+			if (isDigit()) {
+				const std::string beforeDot = extractNumber();
+
+				if (!isEnd() and (*current == '.')) {
+					save = current++;
+
+					if (isDigit()) {
+						const std::string afterDot = extractNumber();
+						if (!std::isalpha(*current)) {
+							return Token(OpCode::LITERAL, std::stod(beforeDot + "." + afterDot), pos()); // Literal Double
+						}
 					}
-					stream.rewind();
+					current = save;
 				}
-				return base::Operation(base::Operator::LOAD, base::StackFrame(base::BasicType(std::stoll(currentToken)))); // Literal Long
+
+				if (!isEnd() and (*current == 'u')) {
+					current++;
+					return Token(OpCode::LITERAL, static_cast<sm_uint>(std::stoul(beforeDot)), pos()); // Literal Long
+				}
+				return Token(OpCode::LITERAL, static_cast<sm_int>(std::stol(beforeDot)), pos()); // Literal Long
 			}
+
+			current = save;
 			return {};
 		}
 
-		std::string extractNumber(SourceStream& stream) const {
+		std::string extractNumber() const {
 			std::string currentToken;
 
-			while (isDigit(stream)) {
-				currentToken += stream.pop();
+			while (isDigit()) {
+				currentToken += *current++;
 			}
+
 			return currentToken;
 		}
 
-		bool isDigit(const SourceStream& stream) const {
-			return !stream.isEnd() && std::isdigit(stream.peak());
+		bool isDigit() const {
+			return !isEnd() and std::isdigit(*current);
 		}
 	};
 }
 
 namespace lexer {
 	class Tokenizer {
-		void runExtractors(SourceStream& stream) {
-			static const std::initializer_list<Extractor*> extractors = {
-				new Extractor_Operator(),
-				new Extractor_NumberLiteral(),
-				new Extractor_Name(),
-			};
+		std::vector<Token> tokens;
+		bool success = true;
 
+		Iterator current;
+		const Iterator begin;
+		const Iterator end;
+		const Source& source;
+
+		void runToNextSync() {
+			while ((current != end) and (!std::isspace(*current))) {
+				current++;
+			}
+		}
+
+		void runExtractors(std::initializer_list<Extractor*> extractors) {
 			for (Extractor* i : extractors) {
-				const std::optional<base::Operation> result = i->extract(stream);
+				ExtractorResult result = i->extract();
 				if (result.has_value()) {
-					tokens.push_back(result.value());
+					tokens.push_back(std::move(result.value()));
 					return;
 				}
 			}
-			throw ex::Exception("Unknown token: ");
+			throw ex::ParserException("Unknown token", std::distance(begin, current));
 		}
-
-		Tokenizer(const std::string& expression) {
-			SourceStream stream(expression);
-
-			while (!stream.isEnd()) {
-				stream.skipWhiteSpace();
-
-				if (stream.isEnd()) {
-					return;
-				}
-
-				runExtractors(stream);
-			}
-		}
-
-		std::vector<base::Operation> tokens;
 
 	public:
-		static std::vector<base::Operation> run(const std::string& expression) {
-			return std::move(Tokenizer(expression).tokens);
+		Tokenizer(const Source& source) :
+			source(source), begin(source.begin()), current(source.begin()), end(source.end()) {
+		}
+
+		bool isSuccess() const {
+			return success;
+		}
+
+		std::vector<Token> run() {
+			std::initializer_list<Extractor*> extractors = {
+				new Extractor_Operator(current, end),
+				new Extractor_NumberLiteral(current, end),
+				new Extractor_Name(current, end),
+			};
+
+			while (current != end) {
+				skipWhitespace(current, end);
+
+				if (current == end) {
+					break;
+				}
+
+				try {
+					runExtractors(extractors);
+				} catch (const ex::ParserException& ex) {
+					std::cout << ex.what() << "\n" << source.markedLineAt(ex.getPos()) << std::endl;
+					runToNextSync();
+					success = false;
+				}
+			}
+
+			return std::move(tokens);
 		}
 	};
 }

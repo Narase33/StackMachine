@@ -27,10 +27,6 @@ namespace base {
 
 	template <typename... T>
 	std::string toString(const T&... t) {
-		/*std::stringstream stream;
-		((stream << t) << ...);
-		return stream.str();*/
-
 		std::stringstream stream;
 		_toString(stream, t);
 		return stream.str();

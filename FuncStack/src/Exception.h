@@ -11,15 +11,21 @@ namespace ex {
 		using std::runtime_error::runtime_error;
 	};
 
-	void assure(bool condition, std::string&& msg) {
-		if (!condition) {
-			throw Exception(std::forward<std::string>(msg));
+	class ParserException : public Exception {
+		size_t pos;
+	public:
+		ParserException(const std::string& message, size_t pos) :
+			Exception(message), pos(pos) {
 		}
-	}
 
-	void assure(bool condition, const char* msg) {
+		size_t getPos() const {
+			return pos;
+		}
+	};
+
+	void assume(bool condition, const std::string& message) {
 		if (!condition) {
-			throw Exception(msg);
+			throw ex::Exception(message);
 		}
 	}
 }

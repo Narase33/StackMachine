@@ -3,11 +3,12 @@
 #include <type_traits>
 #include <variant>
 #include <string_view>
+#include <ctype.h>
 
 #include "src/Exception.h"
 
-using sm_int = long;
-using sm_uint = size_t;
+using sm_int = int64_t;
+using sm_uint = uint64_t;
 using sm_float = double;
 using sm_bool = bool;
 
@@ -18,12 +19,14 @@ template<typename T> using is_bool = std::is_same<T, sm_bool>;
 
 namespace base {
 
-	class BasicType {
+	class BasicType final {
 	public:
 		explicit BasicType(long long value) : inner((sm_int)value) {}
 		explicit BasicType(long value) : inner((sm_int)value) {}
 		explicit BasicType(int value) : inner((sm_int)value) {}
-		explicit BasicType(size_t value) : inner((sm_uint)value) {}
+		explicit BasicType(unsigned long long value) : inner((sm_uint)value) {}
+		explicit BasicType(unsigned long value) : inner((sm_uint)value) {}
+		explicit BasicType(unsigned int value) : inner((sm_uint)value) {}
 		explicit BasicType(long double value) : inner((sm_float)value) {}
 		explicit BasicType(double value) : inner((sm_float)value) {}
 		explicit BasicType(float value) : inner((sm_float)value) {}
@@ -100,53 +103,59 @@ namespace base {
 
 		friend BasicType operator+(const BasicType& a, const BasicType& b) {
 			return std::visit([](const auto& a, const auto& b) {
-				ex::assure(!is_bool<decltype(a)>::value, "Unexpected usage of operator+ with bool (first parameter)");
-				ex::assure(!is_bool<decltype(b)>::value, "Unexpected usage of operator+ with bool (second parameter)");
+				ex::assume(!is_bool<decltype(a)>::value, "Unexpected usage of operator+ with bool (first parameter)");
+				ex::assume(!is_bool<decltype(b)>::value, "Unexpected usage of operator+ with bool (second parameter)");
 				return base::BasicType(a + b);
 			}, a.inner, b.inner);
 		}
 
 		friend BasicType operator-(const BasicType& a, const BasicType& b) {
 			return std::visit([](const auto& a, const auto& b) {
-				ex::assure(!is_bool<decltype(a)>::value, "Unexpected usage of operator- with bool (first parameter)");
-				ex::assure(!is_bool<decltype(b)>::value, "Unexpected usage of operator- with bool (second parameter)");
+				ex::assume(!is_bool<decltype(a)>::value, "Unexpected usage of operator- with bool (first parameter)");
+				ex::assume(!is_bool<decltype(b)>::value, "Unexpected usage of operator- with bool (second parameter)");
 				return base::BasicType(a - b);
 			}, a.inner, b.inner);
 		}
 
 		friend BasicType operator*(const BasicType& a, const BasicType& b) {
 			return std::visit([](const auto& a, const auto& b) {
-				ex::assure(!is_bool<decltype(a)>::value, "Unexpected usage of operator* with bool (first parameter)");
-				ex::assure(!is_bool<decltype(b)>::value, "Unexpected usage of operator* with bool (second parameter)");
+				ex::assume(!is_bool<decltype(a)>::value, "Unexpected usage of operator* with bool (first parameter)");
+				ex::assume(!is_bool<decltype(b)>::value, "Unexpected usage of operator* with bool (second parameter)");
 				return base::BasicType(a * b);
 			}, a.inner, b.inner);
 		}
 
 		friend BasicType operator/(const BasicType& a, const BasicType& b) {
 			return std::visit([](const auto& a, const auto& b) {
-				ex::assure(!is_bool<decltype(a)>::value, "Unexpected usage of operator/ with bool (first parameter)");
-				ex::assure(!is_bool<decltype(b)>::value, "Unexpected usage of operator/ with bool (second parameter)");
+				ex::assume(!is_bool<decltype(a)>::value, "Unexpected usage of operator/ with bool (first parameter)");
+				ex::assume(!is_bool<decltype(b)>::value, "Unexpected usage of operator/ with bool (second parameter)");
 
 				if (std::is_same<decltype(b), sm_float>::value) {
-					ex::assure(b != 0.0f, "Division through zero");
+					ex::assume(b != 0.0f, "Division through zero");
 				} else {
-					ex::assure(b != 0, "Division through zero");
+					ex::assume(b != 0, "Division through zero");
 				}
 
 				return base::BasicType(a / b);
 			}, a.inner, b.inner);
 		}
 
+		friend BasicType operator!(const BasicType& a) {
+			return BasicType(!a.getBool());
+		}
+
 		friend BasicType operator==(const BasicType& a, const BasicType& b) noexcept {
+			if (a.typeId() != b.typeId()) {
+				return BasicType(false);
+			}
+
 			return std::visit([](const auto& a, const auto& b) {
 				return base::BasicType(a == b);
 			}, a.inner, b.inner);
 		}
 
 		friend BasicType operator!=(const BasicType& a, const BasicType& b) noexcept {
-			return std::visit([](const auto& a, const auto& b) {
-				return base::BasicType(a != b);
-			}, a.inner, b.inner);
+			return !(a == b);
 		}
 
 		// ===== ===== ===== ===== META ===== ===== ===== =====
@@ -165,8 +174,8 @@ namespace base {
 			switch (id) {
 				case 0: return "int";
 				case 1: return "uint";
-				case 3: return "float";
-				case 4: return "bool";
+				case 2: return "float";
+				case 3: return "bool";
 			}
 			return "";
 		}
@@ -180,6 +189,6 @@ namespace base {
 		}
 
 	private:
-		std::variant<sm_float, sm_int, sm_uint, sm_bool> inner;
+		std::variant<sm_int, sm_uint, sm_float, sm_bool> inner;
 	};
 }

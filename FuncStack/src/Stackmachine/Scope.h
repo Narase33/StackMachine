@@ -43,13 +43,13 @@ public:
 
 	void add(const std::string& name, base::BasicType value) {
 		auto variableIt = _variables.back().find(name);
-		ex::assure(variableIt == _variables.back().end(), "Variable already defined in this scope: " + name);
+		ex::assume(variableIt == _variables.back().end(), "Variable already defined in this scope: " + name);
 		_variables.back()[name] = std::move(value);
 	}
 
 	void set(const std::string& name, base::BasicType value) {
 		base::BasicType* variable = get(name);
-		ex::assure(value.typeId() == variable->typeId(), "Variables have different types: " + variable->toString() + " <- " + value.toString());
+		ex::assume(value.typeId() == variable->typeId(), "Variables have different types: " + variable->toString() + " <- " + value.toString());
 		*variable = std::move(value);
 	}
 

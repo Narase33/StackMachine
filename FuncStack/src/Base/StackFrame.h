@@ -3,9 +3,10 @@
 #include <sstream>
 
 #include "BasicType.h"
+#include "ArrayType.h"
 
 namespace base {
-	class StackFrame {
+	class StackFrame final {
 	public:
 		explicit StackFrame() = default;
 		explicit StackFrame(BasicType value) : inner(std::move(value)) {}

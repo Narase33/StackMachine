@@ -13,9 +13,20 @@
 
 #include "src/Parser/Parser.h"
 
+template <typename T>
+void printSize(const char* name) {
+	std::cout << "Sizeof " << name << ":\t" << sizeof(T) << " Bytes\t" << (sizeof(T) / 8) << " ints" << std::endl;
+}
+
 int main(int argc, char* argv[]) {
-	auto session = Catch::Session();
+	Catch::Session session;
 	session.configData().showSuccessfulTests = false;
 	session.configData().showDurations = Catch::ShowDurations::Always;
-	return session.run(argc, argv);
+	const int testReturn = session.run(argc, argv);
+
+	printSize<base::Operation>("Operation");
+	printSize<base::StackFrame>("StackFrame");
+	printSize<base::BasicType>("BasicType");
+
+	return testReturn;
 }
