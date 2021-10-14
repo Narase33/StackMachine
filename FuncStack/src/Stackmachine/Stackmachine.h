@@ -15,7 +15,7 @@ namespace stackmachine {
 		StackMachine(const std::list<base::Operation>& toExecute) {
 			programm.reserve(toExecute.size() + 1);
 			std::copy(toExecute.begin(), toExecute.end(), std::back_inserter(programm));
-			programm.push_back(base::Operation(OpCode::END_PROGRAM));
+			programm.push_back(base::Operation(base::OpCode::END_PROGRAM));
 			pc = programm.begin();
 		}
 
@@ -42,7 +42,7 @@ namespace stackmachine {
 				}
 			}*/
 
-			while (pc->getOpCode() != OpCode::END_PROGRAM) {
+			while (pc->getOpCode() != base::OpCode::END_PROGRAM) {
 				execNext();
 				pc++;
 			}
@@ -91,61 +91,61 @@ namespace stackmachine {
 
 		void execNext() {
 			switch (pc->getOpCode()) {
-				case OpCode::LOAD:
+				case base::OpCode::LOAD:
 					dataStack.push(resolve(pc->firstValue()));
 					break;
-				case OpCode::STORE:
+				case base::OpCode::STORE:
 				{
 					base::BasicType variableValue = pop();
 					variables.set(pc->firstValue().getName(), std::move(variableValue));
 				}
 				break;
-				case OpCode::CREATE:
+				case base::OpCode::CREATE:
 				{
-					const sm_uint typeId = pc->firstValue().getValue().getUint();
+					const base::sm_uint typeId = pc->firstValue().getValue().getUint();
 					const std::string& variableName = pc->secondValue().getName();
-					variables.add(variableName, base::BasicType::idToType(typeId));
+					variables.add(variableName, base::BasicType::fromId(static_cast<base::TypeIndex>(typeId)));
 				}
 				break;
-				case OpCode::POP:
+				case base::OpCode::POP:
 					pop();
 					break;
-				case OpCode::INCR:
+				case base::OpCode::INCR:
 					executeOP(std::plus(), base::BasicType(1));
 					break;
-				case OpCode::DECR:
+				case base::OpCode::DECR:
 					executeOP(std::minus(), base::BasicType(1));
 					break;
-				case OpCode::EQ:
+				case base::OpCode::EQ:
 					executeOP(std::equal_to());
 					break;
-				case OpCode::UNEQ:
+				case base::OpCode::UNEQ:
 					executeOP(std::not_equal_to());
 					break;
-				case OpCode::ADD:
+				case base::OpCode::ADD:
 					executeOP(std::plus());
 					break;
-				case OpCode::SUB:
+				case base::OpCode::SUB:
 					executeOP(std::minus());
 					break;
-				case OpCode::MULT:
+				case base::OpCode::MULT:
 					executeOP(std::multiplies());
 					break;
-				case OpCode::DIV:
+				case base::OpCode::DIV:
 					executeOP(std::divides());
 					break;
-				case OpCode::JUMP:
+				case base::OpCode::JUMP:
 					pc += pc->firstValue().getValue().getInt() - 1; // loop will increment +1
 					break;
-				case OpCode::JUMP_IF:
+				case base::OpCode::JUMP_IF:
 					if (pop().getBool() == false) {
 						pc += pc->firstValue().getValue().getInt() - 1; // loop will increment +1
 					}
 					break;
-				case OpCode::BRACKET_CURLY_OPEN:
+				case base::OpCode::BRACKET_CURLY_OPEN:
 					variables.newScope();
 					break;
-				case OpCode::BRACKET_CURLY_CLOSE:
+				case base::OpCode::BRACKET_CURLY_CLOSE:
 					variables.leaveScope();
 					break;
 				default:

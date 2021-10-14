@@ -3,7 +3,7 @@
 #include "src/Base/Operation.h"
 #include "src/Base/StackFrame.h"
 
-namespace parser {
+namespace compiler {
 	class PostParser {
 		using list = std::list<base::Operation>;
 
@@ -31,16 +31,16 @@ namespace parser {
 		PostParser(list& _ops) : ops(_ops) {
 			for (it = ops.begin(); it != ops.end(); it++) {
 				switch (it->getOpCode()) {
-					case OpCode::LABEL:
+					case base::OpCode::LABEL:
 					{
 						const size_t labelId = it->firstValue().getValue().getUint();
 
 						for (JumpPoint& jumpPoint : jumps[labelId]) {
-							const OpCode op = jumpPoint.frame->getOpCode();
+							const base::OpCode op = jumpPoint.frame->getOpCode();
 							const int jumpDistance = static_cast<int>(currentPos - jumpPoint.pos);
 
 							if (std::abs(jumpDistance) > 1) {
-								const OpCode relativeJump = (op == OpCode::JUMP_LABEL) ? OpCode::JUMP : OpCode::JUMP_IF;
+								const base::OpCode relativeJump = (op == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF;
 								*jumpPoint.frame = base::Operation(relativeJump, base::StackFrame(base::BasicType(jumpDistance)));
 								optimizedJumps.push_back(jumpPoint);
 							} else {
@@ -52,18 +52,18 @@ namespace parser {
 						deleteFrame(it, currentPos);
 						break;
 					}
-					case OpCode::JUMP_LABEL: // fallthrough
-					case OpCode::JUMP_LABEL_IF:
+					case base::OpCode::JUMP_LABEL: // fallthrough
+					case base::OpCode::JUMP_LABEL_IF:
 					{
 						const size_t labelId = it->firstValue().getValue().getUint();
 
 						const auto jumpDestination = labels.find(labelId);
 						if (jumpDestination != labels.end()) {
-							const OpCode op = it->getOpCode();
+							const base::OpCode op = it->getOpCode();
 							const int jumpDistance = static_cast<int>(jumpDestination->second - currentPos);
 
 							if (std::abs(jumpDistance) > 1) {
-								const OpCode relativeJump = (op == OpCode::JUMP_LABEL) ? OpCode::JUMP : OpCode::JUMP_IF;
+								const base::OpCode relativeJump = (op == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF;
 								*it = base::Operation(relativeJump, base::StackFrame(base::BasicType(jumpDistance)));
 								optimizedJumps.push_back(JumpPoint{ it, currentPos });
 							} else {
@@ -86,7 +86,7 @@ namespace parser {
 
 			for (JumpPoint& jump : optimizedJumps) {
 				if (jumpsOver(jump, pos)) {
-					sm_int& jumpDistance = jump.frame->firstValue().getValue().getInt();
+					base::sm_int& jumpDistance = jump.frame->firstValue().getValue().getInt();
 					jumpDistance += (jumpDistance > 0) ? -1 : +1;
 					// TODO recursive
 				}

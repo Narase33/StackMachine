@@ -5,14 +5,14 @@
 
 #include <memory>
 
-namespace lexer {
+namespace compiler {
 	/*
 	Class convertes code between braces into recursive nodes representing those braces
 	*/
 	class GroupOrganizer {
 		using Iterator = std::vector<Token>::const_iterator;
 
-		const Source& source;
+		const base::Source& source;
 		Iterator current;
 		const Iterator end;
 		const Iterator begin;
@@ -26,7 +26,7 @@ namespace lexer {
 			}
 		}
 
-		void jumpToOpposingBracket(OpCode open, OpCode close) {
+		void jumpToOpposingBracket(base::OpCode open, base::OpCode close) {
 			const Iterator origin = current;
 
 			int openGroups = 1;
@@ -45,15 +45,15 @@ namespace lexer {
 		}
 
 		bool extractGroup() {
-			OpCode open = OpCode::ERR;
-			OpCode close = OpCode::ERR;
+			base::OpCode open = base::OpCode::ERR;
+			base::OpCode close = base::OpCode::ERR;
 
-			if (current->id == OpCode::BRACKET_ROUND_OPEN) {
-				open = OpCode::BRACKET_ROUND_OPEN;
-				close = OpCode::BRACKET_ROUND_CLOSE;
-			} else if (current->id == OpCode::BRACKET_CURLY_OPEN) {
-				open = OpCode::BRACKET_CURLY_OPEN;
-				close = OpCode::BRACKET_CURLY_CLOSE;
+			if (current->id == base::OpCode::BRACKET_ROUND_OPEN) {
+				open = base::OpCode::BRACKET_ROUND_OPEN;
+				close = base::OpCode::BRACKET_ROUND_CLOSE;
+			} else if (current->id == base::OpCode::BRACKET_CURLY_OPEN) {
+				open = base::OpCode::BRACKET_CURLY_OPEN;
+				close = base::OpCode::BRACKET_CURLY_CLOSE;
 			} else {
 				return false;
 			}
@@ -65,7 +65,7 @@ namespace lexer {
 			jumpToOpposingBracket(open, close);
 
 			GroupOrganizer organizer(begin, current, source);
-			outputNodes.push_back(lexer::Node(std::move(groupToken), organizer.run()));
+			outputNodes.push_back(Node(std::move(groupToken), organizer.run()));
 			return true;
 		}
 
@@ -74,11 +74,11 @@ namespace lexer {
 			return success;
 		}
 		
-		GroupOrganizer(Iterator begin, Iterator end, const Source& source) :
+		GroupOrganizer(Iterator begin, Iterator end, const base::Source& source) :
 			begin(begin), current(begin), end(end), source(source) {
 		}
 
-		GroupOrganizer(const std::vector<Token>& nodes, const Source& source) :
+		GroupOrganizer(const std::vector<Token>& nodes, const base::Source& source) :
 			begin(nodes.begin()), current(nodes.begin()), end(nodes.end()), source(source) {
 		}
 
@@ -87,7 +87,7 @@ namespace lexer {
 				while (current != end) {
 					const bool success = extractGroup();
 					if (!success) {
-						outputNodes.push_back(lexer::Node(*current));
+						outputNodes.push_back(Node(*current));
 					}
 					current++;
 				}

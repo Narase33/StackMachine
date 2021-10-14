@@ -8,7 +8,7 @@
 
 #include "Token.h"
 
-namespace {
+namespace compiler {
 	using Iterator = std::string::const_iterator;
 	using ExtractorResult = std::optional<Token>;
 
@@ -68,16 +68,16 @@ namespace {
 			if (!isEnd()) {
 				if ((current + 1) != end) {
 					const std::string_view op(current, current + 2);
-					const OpCode symbol = opCodeFromSymbol(op);
-					if (symbol != OpCode::ERR) {
+					const base::OpCode symbol = base::opCodeFromSymbol(op);
+					if (symbol != base::OpCode::ERR) {
 						current += 2;
 						return Token(symbol, pos());
 					}
 				}
 
 				const std::string_view op(current, current + 1);
-				const OpCode symbol = opCodeFromSymbol(op);
-				if (symbol != OpCode::ERR) {
+				const base::OpCode symbol = base::opCodeFromSymbol(op);
+				if (symbol != base::OpCode::ERR) {
 					current += 1;
 					return Token(symbol, pos());
 				}
@@ -99,20 +99,20 @@ namespace {
 				const std::string lexem = extractLexem(partOfVariableName);
 
 				if ((lexem == "true") or (lexem == "false")) {
-					return Token(OpCode::LITERAL, lexem == "true", pos()); // Literal Bool
+					return Token(base::OpCode::LITERAL, lexem == "true", pos()); // Literal Bool
 				}
 
-				const OpCode symbol = opCodeFromKeyword(lexem);
-				if (symbol != OpCode::ERR) {
+				const base::OpCode symbol = base::opCodeFromKeyword(lexem);
+				if (symbol != base::OpCode::ERR) {
 					return Token(symbol, pos()); // Type Keyword
 				}
 
-				const size_t variableTypeId = base::BasicType::stringToId(lexem);
-				if (variableTypeId != -1) {
-					return Token(OpCode::TYPE, variableTypeId, pos());
+				const base::TypeIndex variableTypeId = base::stringToId(lexem);
+				if (variableTypeId != base::TypeIndex::Err) {
+					return Token(base::OpCode::TYPE, static_cast<size_t>(variableTypeId), pos());
 				}
 
-				return Token(OpCode::NAME, lexem, pos()); // Name
+				return Token(base::OpCode::NAME, lexem, pos()); // Name
 			}
 
 			current = save;
@@ -136,7 +136,7 @@ namespace {
 					if (isDigit()) {
 						const std::string afterDot = extractNumber();
 						if (!std::isalpha(*current)) {
-							return Token(OpCode::LITERAL, std::stod(beforeDot + "." + afterDot), pos()); // Literal Double
+							return Token(base::OpCode::LITERAL, std::stod(beforeDot + "." + afterDot), pos()); // Literal Double
 						}
 					}
 					current = save;
@@ -144,9 +144,9 @@ namespace {
 
 				if (!isEnd() and (*current == 'u')) {
 					current++;
-					return Token(OpCode::LITERAL, static_cast<sm_uint>(std::stoul(beforeDot)), pos()); // Literal Long
+					return Token(base::OpCode::LITERAL, static_cast<base::sm_uint>(std::stoul(beforeDot)), pos()); // Literal Long
 				}
-				return Token(OpCode::LITERAL, static_cast<sm_int>(std::stol(beforeDot)), pos()); // Literal Long
+				return Token(base::OpCode::LITERAL, static_cast<base::sm_int>(std::stol(beforeDot)), pos()); // Literal Long
 			}
 
 			current = save;
@@ -167,9 +167,7 @@ namespace {
 			return !isEnd() and std::isdigit(*current);
 		}
 	};
-}
 
-namespace lexer {
 	class Tokenizer {
 		std::vector<Token> tokens;
 		bool success = true;
@@ -177,7 +175,7 @@ namespace lexer {
 		Iterator current;
 		const Iterator begin;
 		const Iterator end;
-		const Source& source;
+		const base::Source& source;
 
 		void runToNextSync() {
 			while ((current != end) and (!std::isspace(*current))) {
@@ -197,7 +195,7 @@ namespace lexer {
 		}
 
 	public:
-		Tokenizer(const Source& source) :
+		Tokenizer(const base::Source& source) :
 			source(source), begin(source.begin()), current(source.begin()), end(source.end()) {
 		}
 

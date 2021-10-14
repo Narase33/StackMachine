@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 project ("FuncStack")
 
-add_executable(FuncStack FuncStack/FuncStack.cpp "FuncStack/src/Base/Source.h" "FuncStack/src/Base/ArrayType.h")
+add_executable(FuncStack FuncStack/FuncStack.cpp "FuncStack/src/Base/Source.h" "FuncStack/src/Base/ArrayType.h" "FuncStack/src/Base/AtomicTypes.h")
 
 target_compile_options(FuncStack PUBLIC "/permissive-")
 

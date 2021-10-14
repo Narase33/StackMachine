@@ -13,6 +13,10 @@
 
 #include "src/Parser/Parser.h"
 
+/* TODO
+	- String interning
+*/
+
 template <typename T>
 void printSize(const char* name) {
 	std::cout << "Sizeof " << name << ":\t" << sizeof(T) << " Bytes\t" << (sizeof(T) / 8) << " ints" << std::endl;

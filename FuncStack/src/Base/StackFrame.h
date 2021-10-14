@@ -63,5 +63,4 @@ namespace base {
 
 		return stream.str();
 	}
-
-} // namespace base
+}

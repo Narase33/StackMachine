@@ -7,7 +7,7 @@
 #include "src/Exception.h"
 #include "Token.h"
 
-namespace lexer {
+namespace compiler {
 	class Node {
 		Token token;
 		std::vector<Node> group;
@@ -26,15 +26,15 @@ namespace lexer {
 			return token;
 		}
 
-		OpCode getOpCode() const {
+		base::OpCode getOpCode() const {
 			return token.id;
 		}
 
 		bool isGroup() const {
-			return utils::any_of(token.id, { OpCode::BRACKET_ROUND_OPEN, OpCode::BRACKET_CURLY_OPEN });
+			return utils::any_of(token.id, { base::OpCode::BRACKET_ROUND_OPEN, base::OpCode::BRACKET_CURLY_OPEN });
 		}
 
-		bool is(OpCode id) const {
+		bool is(base::OpCode id) const {
 			return token.id == id;
 		}
 

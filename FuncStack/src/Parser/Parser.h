@@ -6,40 +6,42 @@
 #include "PostParser.h"
 #include "src/Base/Source.h"
 
-class Compiler {
-	const Source source;
-	std::list<base::Operation> program;
-	const bool success = true;
+namespace compiler {
+	class Compiler {
+		const base::Source source;
+		std::list<base::Operation> program;
+		const bool success = true;
 
 
-	void assume(bool condition, const std::string& message) const {
-		if (!condition) {
-			throw ex::Exception(message);
+		void assume(bool condition, const std::string& message) const {
+			if (!condition) {
+				throw ex::Exception(message);
+			}
 		}
-	}
 
-public:
-	Compiler(std::string&& expression) : source(std::move(expression)) {
-		lexer::Tokenizer tokenizer(source);
-		const std::vector<Token> tokens = tokenizer.run();
-		assume(tokenizer.isSuccess(), "Errors during tokenizing");
+	public:
+		Compiler(std::string&& expression) : source(std::move(expression)) {
+			Tokenizer tokenizer(source);
+			const std::vector<Token> tokens = tokenizer.run();
+			assume(tokenizer.isSuccess(), "Errors during tokenizing");
 
-		lexer::GroupOrganizer grouping(tokens, source);
-		const std::vector<lexer::Node> nodes = grouping.run();
-		assume(grouping.isSuccess(), "Errors during grouping");
+			GroupOrganizer grouping(tokens, source);
+			const std::vector<Node> nodes = grouping.run();
+			assume(grouping.isSuccess(), "Errors during grouping");
 
-		parser::ShuntingYard shunting(nodes, source);
-		program = shunting.run();
-		assume(shunting.isSuccess(), "Errors during shunting yard");
-		
-		parser::PostParser::run(program);
-	}
+			ShuntingYard shunting(nodes, source);
+			program = shunting.run();
+			assume(shunting.isSuccess(), "Errors during shunting yard");
 
-	const std::list<base::Operation>& getProgram() const {
-		return program;
-	}
+			PostParser::run(program);
+		}
 
-	bool isSuccessful() const {
-		return success;
-	}
-};
+		const std::list<base::Operation>& getProgram() const {
+			return program;
+		}
+
+		bool isSuccessful() const {
+			return success;
+		}
+	};
+}

@@ -6,19 +6,9 @@
 #include <ctype.h>
 
 #include "src/Exception.h"
-
-using sm_int = int64_t;
-using sm_uint = uint64_t;
-using sm_float = double;
-using sm_bool = bool;
-
-template<typename T> using is_int = std::is_same<T, sm_int>;
-template<typename T> using is_uint = std::is_same<T, sm_uint>;
-template<typename T> using is_float = std::is_same<T, sm_float>;
-template<typename T> using is_bool = std::is_same<T, sm_bool>;
+#include "AtomicTypes.h"	
 
 namespace base {
-
 	class BasicType final {
 	public:
 		explicit BasicType(long long value) : inner((sm_int)value) {}
@@ -32,6 +22,16 @@ namespace base {
 		explicit BasicType(float value) : inner((sm_float)value) {}
 		explicit BasicType(bool value) : inner((sm_bool)value) {}
 		explicit BasicType() {}
+
+		static BasicType fromId(TypeIndex id) {
+			switch (id) {
+				case TypeIndex::Int: return BasicType(sm_int{});
+				case TypeIndex::Uint: return BasicType(sm_uint{});
+				case TypeIndex::Float: return BasicType(sm_float{});
+				case TypeIndex::Bool: return BasicType(sm_bool{});
+				default: throw std::exception("Unknown type id");
+			}
+		}
 
 		constexpr bool isInt() const {
 			return std::holds_alternative<sm_int>(inner);
@@ -81,8 +81,8 @@ namespace base {
 			return std::get<sm_bool>(inner);
 		}
 
-		constexpr size_t typeId() const {
-			return inner.index();
+		constexpr TypeIndex typeId() const {
+			return static_cast<TypeIndex>(inner.index());
 		}
 
 		std::string toString() const {
@@ -96,39 +96,39 @@ namespace base {
 		friend std::ostream& operator<<(std::ostream& o, const BasicType& type) {
 			o << std::boolalpha;
 			std::visit([&](auto&& a) {
-				o << "[type: " << BasicType::idToString(type.typeId()) << ", value: " << a << "]";
+				o << "[type: " << idToString(type.typeId()) << ", value: " << a << "]";
 			}, type.inner);
 			return o;
 		}
 
 		friend BasicType operator+(const BasicType& a, const BasicType& b) {
 			return std::visit([](const auto& a, const auto& b) {
-				ex::assume(!is_bool<decltype(a)>::value, "Unexpected usage of operator+ with bool (first parameter)");
-				ex::assume(!is_bool<decltype(b)>::value, "Unexpected usage of operator+ with bool (second parameter)");
-				return base::BasicType(a + b);
+				ex::assume(!std::is_same<bool, decltype(a)>::value, "Unexpected usage of operator+ with bool (first parameter)");
+				ex::assume(!std::is_same<bool, decltype(b)>::value, "Unexpected usage of operator+ with bool (second parameter)");
+				return BasicType(a + b);
 			}, a.inner, b.inner);
 		}
 
 		friend BasicType operator-(const BasicType& a, const BasicType& b) {
 			return std::visit([](const auto& a, const auto& b) {
-				ex::assume(!is_bool<decltype(a)>::value, "Unexpected usage of operator- with bool (first parameter)");
-				ex::assume(!is_bool<decltype(b)>::value, "Unexpected usage of operator- with bool (second parameter)");
-				return base::BasicType(a - b);
+				ex::assume(!std::is_same<bool, decltype(a)>::value, "Unexpected usage of operator- with bool (first parameter)");
+				ex::assume(!std::is_same<bool, decltype(b)>::value, "Unexpected usage of operator- with bool (second parameter)");
+				return BasicType(a - b);
 			}, a.inner, b.inner);
 		}
 
 		friend BasicType operator*(const BasicType& a, const BasicType& b) {
 			return std::visit([](const auto& a, const auto& b) {
-				ex::assume(!is_bool<decltype(a)>::value, "Unexpected usage of operator* with bool (first parameter)");
-				ex::assume(!is_bool<decltype(b)>::value, "Unexpected usage of operator* with bool (second parameter)");
-				return base::BasicType(a * b);
+				ex::assume(!std::is_same<bool, decltype(a)>::value, "Unexpected usage of operator* with bool (first parameter)");
+				ex::assume(!std::is_same<bool, decltype(b)>::value, "Unexpected usage of operator* with bool (second parameter)");
+				return BasicType(a * b);
 			}, a.inner, b.inner);
 		}
 
 		friend BasicType operator/(const BasicType& a, const BasicType& b) {
 			return std::visit([](const auto& a, const auto& b) {
-				ex::assume(!is_bool<decltype(a)>::value, "Unexpected usage of operator/ with bool (first parameter)");
-				ex::assume(!is_bool<decltype(b)>::value, "Unexpected usage of operator/ with bool (second parameter)");
+				ex::assume(!std::is_same<bool, decltype(a)>::value, "Unexpected usage of operator/ with bool (first parameter)");
+				ex::assume(!std::is_same<bool, decltype(b)>::value, "Unexpected usage of operator/ with bool (second parameter)");
 
 				if (std::is_same<decltype(b), sm_float>::value) {
 					ex::assume(b != 0.0f, "Division through zero");
@@ -136,7 +136,7 @@ namespace base {
 					ex::assume(b != 0, "Division through zero");
 				}
 
-				return base::BasicType(a / b);
+				return BasicType(a / b);
 			}, a.inner, b.inner);
 		}
 
@@ -150,42 +150,12 @@ namespace base {
 			}
 
 			return std::visit([](const auto& a, const auto& b) {
-				return base::BasicType(a == b);
+				return BasicType(a == b);
 			}, a.inner, b.inner);
 		}
 
 		friend BasicType operator!=(const BasicType& a, const BasicType& b) noexcept {
 			return !(a == b);
-		}
-
-		// ===== ===== ===== ===== META ===== ===== ===== =====
-
-		static BasicType idToType(size_t id) {
-			switch (id) {
-				case 0: return BasicType(sm_int{});
-				case 1: return BasicType(sm_uint{});
-				case 2: return BasicType(sm_float{});
-				case 3: return BasicType(sm_bool{});
-				default: throw std::exception("Unknown type id");
-			}
-		}
-
-		static std::string idToString(size_t id) {
-			switch (id) {
-				case 0: return "int";
-				case 1: return "uint";
-				case 2: return "float";
-				case 3: return "bool";
-			}
-			return "";
-		}
-
-		static size_t stringToId(const std::string_view name) {
-			if (name == "int") return 0;
-			if (name == "uint") return 1;
-			if (name == "float") return 2;
-			if (name == "bool") return 3;
-			return -1;
 		}
 
 	private:
