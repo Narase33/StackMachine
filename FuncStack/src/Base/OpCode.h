@@ -15,6 +15,7 @@ namespace base {
 		LITERAL,
 		IF, ELSE,
 		BRACKET_ROUND_OPEN, BRACKET_ROUND_CLOSE,
+		BRACKET_SQUARE_OPEN, BRACKET_SQUARE_CLOSE,
 		TYPE,
 
 		// Lexer + Interpreter
@@ -47,6 +48,8 @@ namespace base {
 				case ')': return OpCode::BRACKET_ROUND_CLOSE;
 				case '{': return OpCode::BRACKET_CURLY_OPEN;
 				case '}': return  OpCode::BRACKET_CURLY_CLOSE;
+				case '[': return OpCode::BRACKET_SQUARE_OPEN;
+				case ']': return  OpCode::BRACKET_SQUARE_CLOSE;
 				case '>': return OpCode::BIGGER;
 				case '<': return OpCode::LESS;
 				case '+': return OpCode::ADD;
@@ -71,6 +74,7 @@ namespace base {
 			case OpCode::NAME: return 0;
 			case OpCode::BRACKET_ROUND_OPEN: return 0;
 			case OpCode::BRACKET_CURLY_OPEN: return 0;
+			case OpCode::BRACKET_SQUARE_OPEN: return 0;
 			case OpCode::EQ: return 1;
 			case OpCode::UNEQ: return 1;
 			case OpCode::BIGGER: return 2;
@@ -83,6 +87,42 @@ namespace base {
 			case OpCode::DECR: return 5;
 		}
 		return -1;
+	}
+
+	std::pair<OpCode, OpCode> getBracketGroup(OpCode openBracket) {
+		switch (openBracket) {
+			case OpCode::BRACKET_ROUND_OPEN:
+			case OpCode::BRACKET_ROUND_CLOSE: return { OpCode::BRACKET_ROUND_OPEN, OpCode::BRACKET_ROUND_CLOSE };
+			case OpCode::BRACKET_CURLY_OPEN:
+			case OpCode::BRACKET_CURLY_CLOSE: return { OpCode::BRACKET_CURLY_OPEN, OpCode::BRACKET_CURLY_CLOSE };
+			case OpCode::BRACKET_SQUARE_OPEN:
+			case OpCode::BRACKET_SQUARE_CLOSE: return { OpCode::BRACKET_SQUARE_OPEN, OpCode::BRACKET_SQUARE_CLOSE };
+			default: return { OpCode::ERR, OpCode::ERR };
+		}
+	}
+
+	bool isOpeningBracket(OpCode op) {
+		switch (op) {
+			case OpCode::BRACKET_ROUND_OPEN:
+			case OpCode::BRACKET_CURLY_OPEN:
+			case OpCode::BRACKET_SQUARE_OPEN:
+				return true;
+			default: return false;
+		}
+	}
+
+	bool isClosingBracket(OpCode op) {
+		switch (op) {
+			case OpCode::BRACKET_ROUND_CLOSE:
+			case OpCode::BRACKET_CURLY_CLOSE:
+			case OpCode::BRACKET_SQUARE_CLOSE:
+				return true;
+			default: return false;
+		}
+	}
+
+	bool isBracket(OpCode op) {
+		return isOpeningBracket(op) or isClosingBracket(op);
 	}
 
 #define SM_REGISTER_NAME(x) case x: return #x
@@ -105,6 +145,8 @@ namespace base {
 			SM_REGISTER_NAME(OpCode::ELSE);
 			SM_REGISTER_NAME(OpCode::BRACKET_ROUND_OPEN);
 			SM_REGISTER_NAME(OpCode::BRACKET_ROUND_CLOSE);
+			SM_REGISTER_NAME(OpCode::BRACKET_SQUARE_OPEN);
+			SM_REGISTER_NAME(OpCode::BRACKET_SQUARE_CLOSE);
 
 			// Lexer + Interpreter
 			SM_REGISTER_NAME(OpCode::BRACKET_CURLY_OPEN);

@@ -6,7 +6,7 @@
 #include <list>
 #include <vector>
 
-#include "Lexer/Node.h"
+#include "Token.h"
 
 #include "src/Utils/Stream.h"
 #include "src/Exception.h"
@@ -15,7 +15,7 @@
 
 namespace compiler {
 	class ShuntingYard {
-		using Iterator = std::vector<Node>::const_iterator;
+		using Iterator = std::vector<Token>::const_iterator;
 
 		const base::Source& source;
 		const Iterator end;
@@ -40,7 +40,7 @@ namespace compiler {
 		}
 
 		void runToNextSync() {
-			while ((current != end) and (utils::any_of(current->getToken().id, { base::OpCode::END_STATEMENT, base::OpCode::BRACKET_ROUND_CLOSE, base::OpCode::BRACKET_CURLY_CLOSE }))) {
+			while ((current != end) and (utils::any_of(current->id, { base::OpCode::END_STATEMENT, base::OpCode::BRACKET_ROUND_CLOSE, base::OpCode::BRACKET_CURLY_CLOSE }))) {
 				current++;
 			}
 		}
@@ -63,35 +63,76 @@ namespace compiler {
 			}
 		}
 
-		std::list<base::Operation> shuntingYard(const std::vector<Node>& vec) const {
+		std::list<base::Operation> shuntingYard(const std::vector<Token>& vec) const {
 			return shuntingYard(vec.begin(), vec.end());
 		}
 
+		void unwindGroup() {
+			const Iterator current_copy = current;
+
+			auto [bracketBegin, bracketEnd] = base::getBracketGroup(current->id);
+			assume(bracketBegin != base::OpCode::ERR, "Expected group", current->pos);
+
+			int counter = 1;
+			do {
+				current++;
+				assume(current != end, "Group didnt close", current_copy->pos);
+
+				if (current->id == bracketBegin) counter++;
+				if (current->id == bracketEnd) counter--;
+			} while (counter > 0);
+		}
+
 		std::list<base::Operation> shuntingYard(Iterator this_current, Iterator this_end) const {
-			std::stack<Node, std::vector<Node>> sideStack;
-			std::vector<Node> sortedTokens;
+			const Iterator this_current_copy = this_current;
+
+			std::stack<Token, std::vector<Token>> operatorStack;
+			std::vector<Token> sortedTokens;
 
 			for (; this_current != this_end; this_current++) {
-				if (this_current->is(base::OpCode::LITERAL) or this_current->is(base::OpCode::NAME) or this_current->isGroup()) {
+				if ((this_current->id == base::OpCode::LITERAL) or (this_current->id == base::OpCode::NAME)) {
 					sortedTokens.push_back(*this_current);
 					continue;
 				}
 
-				while (!sideStack.empty() and (getCheckedPriority(sideStack.top().getToken()) >= getCheckedPriority(this_current->getToken()))) {
-					sortedTokens.push_back(sideStack.top());
-					sideStack.pop();
+				if (base::isOpeningBracket(this_current->id)) {
+					operatorStack.push(*this_current);
+					continue;
 				}
-				sideStack.push(this_current->getToken());
+
+				if (base::isClosingBracket(this_current->id)) {
+					auto [bracketOpen, bracketClose] = base::getBracketGroup(this_current->id);
+
+					while (!operatorStack.empty() and (operatorStack.top().id != bracketOpen)) {
+						assume(!base::isOpeningBracket(operatorStack.top().id), "Found closing bracket that doesnt match", this_current->pos);
+						sortedTokens.push_back(operatorStack.top());
+						operatorStack.pop();
+					}
+					assume(operatorStack.size() > 0, "Group didnt end", this_current_copy->pos);
+
+					operatorStack.pop();
+					// if (operatorStack.top() is function) {
+					//		sortedTokens.push_back(operatorStack.top());
+					//		operatorStack.pop();
+					// }
+					continue;
+				}
+
+				while (!operatorStack.empty() and (getCheckedPriority(operatorStack.top()) >= getCheckedPriority(*this_current))) {
+					sortedTokens.push_back(operatorStack.top());
+					operatorStack.pop();
+				}
+				operatorStack.push(*this_current);
 			}
 
-			while (!sideStack.empty()) {
-				sortedTokens.push_back(sideStack.top());
-				sideStack.pop();
+			while (!operatorStack.empty()) {
+				sortedTokens.push_back(operatorStack.top());
+				operatorStack.pop();
 			}
 
 			std::list<base::Operation> program;
 			for (auto it = sortedTokens.begin(); it != sortedTokens.end(); it++) {
-				const base::OpCode opCode = it->getOpCode();
+				const base::OpCode opCode = it->id;
 				switch (opCode) {
 					case base::OpCode::ADD: // fallthrough
 					case base::OpCode::SUB: // fallthrough
@@ -106,37 +147,38 @@ namespace compiler {
 						program.push_back(base::Operation(opCode));
 						break;
 					case base::OpCode::LITERAL:
-						program.push_back(base::Operation(base::OpCode::LOAD, base::StackFrame(base::BasicType(literalToValue(it->getToken().value)))));
+						program.push_back(base::Operation(base::OpCode::LOAD, base::StackFrame(base::BasicType(literalToValue(it->value)))));
 						break;
 					case base::OpCode::NAME:
-						program.push_back(base::Operation(base::OpCode::LOAD, base::StackFrame(std::get<std::string>(it->getToken().value))));
+						program.push_back(base::Operation(base::OpCode::LOAD, base::StackFrame(std::get<std::string>(it->value))));
 						break;
-					case base::OpCode::BRACKET_ROUND_OPEN:
-						program.splice(program.end(), shuntingYard(it->getGroup()));
 				}
 			}
 
 			return program;
 		}
 
-		void insertParsed(const Node& source) {
-			std::list<base::Operation> ops = shuntingYard(source.getGroup());
-			program.splice(program.end(), std::move(ops));
-		}
-
-		void parseSubGroup(base::OpCode expectedOperator) {
-			const Node next = *current++;
-			assume_isOperator(next.getOpCode(), expectedOperator, next.getToken().pos);
-			insertParsed(next);
+		void insertCurlyBrackets() {
+			assume_isOperator(current->id, base::OpCode::BRACKET_CURLY_OPEN, current->pos);
+			const Iterator beginBody = current;
+			unwindGroup();
+			program.push_back(base::Operation(base::OpCode::BRACKET_CURLY_OPEN));
+			program.splice(program.end(), ShuntingYard(beginBody + 1, current, source).run());
+			program.push_back(base::Operation(base::OpCode::BRACKET_CURLY_CLOSE));
+			current++;
 		}
 
 		void insert_if_base(size_t jumpToEndIndex) {
-			parseSubGroup(base::OpCode::BRACKET_ROUND_OPEN);
+			assume_isOperator(current->id, base::OpCode::BRACKET_ROUND_OPEN, current->pos);
+			const Iterator beginCondition = current;
+			unwindGroup();
+			program.splice(program.end(), shuntingYard(beginCondition, current));
+			current++;
 
 			const size_t jumpOverIndex = nextIndex();
 			program.emplace_back(base::OpCode::JUMP_LABEL_IF, base::StackFrame(base::BasicType(jumpOverIndex))); // jump over if
 
-			parseSubGroup(base::OpCode::BRACKET_CURLY_OPEN);
+			insertCurlyBrackets();
 
 			program.emplace_back(base::OpCode::JUMP_LABEL, base::StackFrame(base::BasicType(jumpToEndIndex))); // jump to end
 			program.emplace_back(base::OpCode::LABEL, base::StackFrame(base::BasicType(jumpOverIndex))); // after if label
@@ -155,23 +197,23 @@ namespace compiler {
 			assume_isOperator(jumpToEndLabel.getOpCode(), base::OpCode::LABEL, 0);
 			program.pop_back();
 
-			if (current->is(base::OpCode::IF)) {
+			if (current->id == base::OpCode::IF) {
 				current++;
 
 				const size_t jumpToEndIndex = jumpToEndLabel.firstValue().getValue().getUint();
 				insert_if_base(jumpToEndIndex);
 			} else {
-				parseSubGroup(base::OpCode::BRACKET_CURLY_OPEN);
+				insertCurlyBrackets();
 			}
 
 			program.push_back(std::move(jumpToEndLabel)); // put back 'else' end label
 		}
 
 		void embeddCodeStatement() {
-			const auto endStatementIt = std::find_if(current, end, [](const Node& n) {
-				return n.getOpCode() == base::OpCode::END_STATEMENT;
+			const auto endStatementIt = std::find_if(current, end, [](const Token& n) {
+				return n.id == base::OpCode::END_STATEMENT;
 			});
-			assume(endStatementIt != end, "Missing end statement!", current->getToken().pos);
+			assume(endStatementIt != end, "Missing end statement!", current->pos);
 
 			program.splice(program.end(), shuntingYard(current, endStatementIt));
 			current = endStatementIt + 1;
@@ -186,25 +228,25 @@ namespace compiler {
 			: current(begin), end(end), source(source) {
 		}
 
-		ShuntingYard(const std::vector<Node>& nodes , const base::Source& source)
+		ShuntingYard(const std::vector<Token>& nodes , const base::Source& source)
 			: current(nodes.begin()), end(nodes.end()), source(source) {
 		}
 
 		std::list<base::Operation> run() {
 			try {
 				while (current != end) {
-					switch (current->getOpCode()) {
+					switch (current->id) {
 						case base::OpCode::TYPE:
 						{
-							base::StackFrame variableType(literalToValue(current->getToken().value));
+							base::StackFrame variableType(literalToValue(current->value));
 							current++;
-							base::StackFrame variableName(std::get<std::string>(current->getToken().value));
+							base::StackFrame variableName(std::get<std::string>(current->value));
 							program.push_back(base::Operation(base::OpCode::CREATE, std::move(variableType), std::move(variableName)));
 						}
 						break;
 						case base::OpCode::NAME:
-							if ((current + 1)->is(base::OpCode::ASSIGN)) {
-								std::string variableName = std::get<std::string>(current->getToken().value);
+							if ((current + 1)->id == base::OpCode::ASSIGN) {
+								std::string variableName = std::get<std::string>(current->value);
 								current += 2;
 								embeddCodeStatement();
 								program.push_back(base::Operation(base::OpCode::STORE, base::StackFrame(std::move(variableName))));
@@ -218,13 +260,8 @@ namespace compiler {
 						case base::OpCode::ELSE:
 							parse_else();
 							break;
-						case base::OpCode::BRACKET_ROUND_OPEN:
-							insertParsed(*current);
-							break;
 						case base::OpCode::BRACKET_CURLY_OPEN:
-							program.push_back(base::Operation(base::OpCode::BRACKET_CURLY_OPEN));
-							insertParsed(*current);
-							program.push_back(base::Operation(base::OpCode::BRACKET_CURLY_CLOSE));
+							insertCurlyBrackets();
 							break;
 						default:
 							embeddCodeStatement();

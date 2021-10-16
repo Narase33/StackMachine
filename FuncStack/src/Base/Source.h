@@ -30,13 +30,11 @@ namespace base {
 			while ((lineBegin > 0) and (code[lineBegin] != '\n')) {
 				lineBegin--;
 			}
-			lineBegin++;
 
 			size_t lineEnd = pos;
 			while ((lineEnd < code.length()) and (code[lineEnd] != '\n')) {
 				lineEnd++;
 			}
-			lineEnd--;
 
 			std::string out = code.substr(lineBegin, lineEnd - lineBegin);
 			out += "\n" + std::string(pos - lineBegin - 1, '-') + "^";

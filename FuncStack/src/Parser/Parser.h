@@ -1,8 +1,7 @@
 #pragma once
 
 #include "ShuntingYard.h"
-#include "Lexer/Tokenizer.h"
-#include "Lexer/Grouping.h"
+#include "Tokenizer.h"
 #include "PostParser.h"
 #include "src/Base/Source.h"
 
@@ -25,11 +24,7 @@ namespace compiler {
 			const std::vector<Token> tokens = tokenizer.run();
 			assume(tokenizer.isSuccess(), "Errors during tokenizing");
 
-			GroupOrganizer grouping(tokens, source);
-			const std::vector<Node> nodes = grouping.run();
-			assume(grouping.isSuccess(), "Errors during grouping");
-
-			ShuntingYard shunting(nodes, source);
+			ShuntingYard shunting(tokens, source);
 			program = shunting.run();
 			assume(shunting.isSuccess(), "Errors during shunting yard");
 
