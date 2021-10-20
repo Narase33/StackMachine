@@ -36,12 +36,6 @@ namespace stackmachine {
 		}
 
 		std::optional<base::StackFrame> exec() {
-			/*for (const auto& i : variables) {
-				if (!i.second.has_value()) {
-					throw std::exception(std::string("Variable not set: " + i.first).c_str());
-				}
-			}*/
-
 			while (pc->getOpCode() != base::OpCode::END_PROGRAM) {
 				execNext();
 				pc++;
@@ -69,7 +63,7 @@ namespace stackmachine {
 			return stream.str();
 		}
 
-		std::stack<base::BasicType> getDataStack() const {
+		const std::stack<base::BasicType>& getDataStack() const {
 			return dataStack;
 		}
 
@@ -91,6 +85,7 @@ namespace stackmachine {
 
 		void execNext() {
 			switch (pc->getOpCode()) {
+				// ==== META ====
 				case base::OpCode::LOAD:
 					dataStack.push(resolve(pc->firstValue()));
 					break;
@@ -108,46 +103,43 @@ namespace stackmachine {
 				}
 				break;
 				case base::OpCode::POP:
-					pop();
-					break;
-				case base::OpCode::INCR:
-					executeOP(std::plus(), base::BasicType(1));
-					break;
-				case base::OpCode::DECR:
-					executeOP(std::minus(), base::BasicType(1));
-					break;
-				case base::OpCode::EQ:
-					executeOP(std::equal_to());
-					break;
-				case base::OpCode::UNEQ:
-					executeOP(std::not_equal_to());
-					break;
-				case base::OpCode::ADD:
-					executeOP(std::plus());
-					break;
-				case base::OpCode::SUB:
-					executeOP(std::minus());
-					break;
-				case base::OpCode::MULT:
-					executeOP(std::multiplies());
-					break;
-				case base::OpCode::DIV:
-					executeOP(std::divides());
-					break;
+					pop(); break;
 				case base::OpCode::JUMP:
 					pc += pc->firstValue().getValue().getInt() - 1; // loop will increment +1
 					break;
-				case base::OpCode::JUMP_IF:
+				case base::OpCode::JUMP_IF_NOT:
 					if (pop().getBool() == false) {
 						pc += pc->firstValue().getValue().getInt() - 1; // loop will increment +1
 					}
 					break;
-				case base::OpCode::BRACKET_CURLY_OPEN:
+				case base::OpCode::BEGIN_SCOPE:
 					variables.newScope();
 					break;
-				case base::OpCode::BRACKET_CURLY_CLOSE:
+				case base::OpCode::END_SCOPE:
 					variables.leaveScope();
 					break;
+					// ==== COMPARE ====
+				case base::OpCode::EQ:
+					executeOP(std::equal_to()); break;
+				case base::OpCode::UNEQ:
+					executeOP(std::not_equal_to()); break;
+				case base::OpCode::LESS:
+					executeOP(std::less()); break;
+				case base::OpCode::BIGGER:
+					executeOP(std::greater()); break;
+					// ==== MATH ====
+				case base::OpCode::INCR:
+					executeOP(std::plus(), base::BasicType(1)); break;
+				case base::OpCode::DECR:
+					executeOP(std::minus(), base::BasicType(1)); break;
+				case base::OpCode::ADD:
+					executeOP(std::plus()); break;
+				case base::OpCode::SUB:
+					executeOP(std::minus()); break;
+				case base::OpCode::MULT:
+					executeOP(std::multiplies()); break;
+				case base::OpCode::DIV:
+					executeOP(std::divides()); break;
 				default:
 					throw ex::Exception("Unrecognized token: "s + opCodeName(pc->getOpCode()));
 			}

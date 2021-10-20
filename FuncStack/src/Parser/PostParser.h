@@ -40,7 +40,7 @@ namespace compiler {
 							const int jumpDistance = static_cast<int>(currentPos - jumpPoint.pos);
 
 							if (std::abs(jumpDistance) > 1) {
-								const base::OpCode relativeJump = (op == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF;
+								const base::OpCode relativeJump = (op == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF_NOT;
 								*jumpPoint.frame = base::Operation(relativeJump, base::StackFrame(base::BasicType(jumpDistance)));
 								optimizedJumps.push_back(jumpPoint);
 							} else {
@@ -53,7 +53,7 @@ namespace compiler {
 						break;
 					}
 					case base::OpCode::JUMP_LABEL: // fallthrough
-					case base::OpCode::JUMP_LABEL_IF:
+					case base::OpCode::JUMP_LABEL_IF_NOT:
 					{
 						const size_t labelId = it->firstValue().getValue().getUint();
 
@@ -63,7 +63,7 @@ namespace compiler {
 							const int jumpDistance = static_cast<int>(jumpDestination->second - currentPos);
 
 							if (std::abs(jumpDistance) > 1) {
-								const base::OpCode relativeJump = (op == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF;
+								const base::OpCode relativeJump = (op == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF_NOT;
 								*it = base::Operation(relativeJump, base::StackFrame(base::BasicType(jumpDistance)));
 								optimizedJumps.push_back(JumpPoint{ it, currentPos });
 							} else {

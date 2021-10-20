@@ -15,25 +15,46 @@ namespace variableTest {
 
 		SECTION("Basic Tests") {
 			{
-				StackMachine machine(Compiler(std::move("int value = 3;")).getProgram());
+				Compiler compiler("int value = 3;");
+				REQUIRE(compiler.isSuccessful());
+
+				StackMachine machine(compiler.getProgram());
+				INFO(machine.toString());
+
 				machine.exec();
+
 				REQUIRE(machine.get("value").getInt() == 3);
 			}
 
 			{
-				StackMachine machine(Compiler(std::move("uint value = 3u;")).getProgram());
+				Compiler compiler("uint value = 3u;");
+				REQUIRE(compiler.isSuccessful());
+
+				StackMachine machine(compiler.getProgram());
+				INFO(machine.toString());
+
 				machine.exec();
 				REQUIRE(machine.get("value").getUint() == 3);
 			}
 
 			{
-				StackMachine machine(Compiler(std::move("float value = 3.3;")).getProgram());
+				Compiler compiler("float value = 3.3;");
+				REQUIRE(compiler.isSuccessful());
+
+				StackMachine machine(compiler.getProgram());
+				INFO(machine.toString());
+
 				machine.exec();
 				REQUIRE(machine.get("value").getFloat() == 3.3);
 			}
 
 			{
-				StackMachine machine(Compiler(std::move("bool value = true;")).getProgram());
+				Compiler compiler("bool value = true;");
+				REQUIRE(compiler.isSuccessful());
+
+				StackMachine machine(compiler.getProgram());
+				INFO(machine.toString());
+
 				machine.exec();
 				REQUIRE(machine.get("value").getBool() == true);
 			}
@@ -44,7 +65,13 @@ namespace variableTest {
 					"uint b = 2u;\n"
 					"float c = 3.3;\n"
 					"bool d = false;\n";
-				StackMachine machine(Compiler(std::move(code)).getProgram());
+
+				Compiler compiler(std::move(code));
+				REQUIRE(compiler.isSuccessful());
+
+				StackMachine machine(compiler.getProgram());
+				INFO(machine.toString());
+
 				machine.exec();
 				REQUIRE(machine.get("a").getInt() == 1);
 				REQUIRE(machine.get("b").getUint() == 2);
@@ -59,8 +86,11 @@ namespace variableTest {
 				"i = 2;"
 				"int j = i + 1;";
 
-			StackMachine machine(Compiler(std::move(code)).getProgram());
-			machine.exec();
+			Compiler compiler(std::move(code));
+			REQUIRE(compiler.isSuccessful());
+
+			StackMachine machine(compiler.getProgram());
+			INFO(machine.toString());			machine.exec();
 
 			REQUIRE(machine.get("i").getInt() == 2);
 			REQUIRE(machine.get("j").getInt() == 3);

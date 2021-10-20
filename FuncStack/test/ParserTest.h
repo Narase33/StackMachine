@@ -12,7 +12,10 @@ namespace parserTest {
 	void test(std::string&& expression, base::BasicType expected) {
 		SECTION(expression) {
 			try {
-				StackMachine machine(Compiler(std::move(expression)).getProgram());
+				Compiler compiler(std::move(expression));
+				REQUIRE(compiler.isSuccessful());
+
+				StackMachine machine(compiler.getProgram());
 				INFO(machine.toString());
 
 				const auto result = machine.exec();

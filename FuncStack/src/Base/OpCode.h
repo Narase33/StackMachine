@@ -8,18 +8,19 @@ namespace base {
 		ERR, NOOP,
 
 		// Parser only
-		JUMP_LABEL, JUMP_LABEL_IF, LABEL,
+		JUMP_LABEL, JUMP_LABEL_IF_NOT, LABEL,
 
 		// Lexer
 		END_STATEMENT,
 		LITERAL,
-		IF, ELSE,
+		IF, ELSE, WHILE,
+		CONTINUE, BREAK,
 		BRACKET_ROUND_OPEN, BRACKET_ROUND_CLOSE,
+		BRACKET_CURLY_OPEN, BRACKET_CURLY_CLOSE,
 		BRACKET_SQUARE_OPEN, BRACKET_SQUARE_CLOSE,
 		TYPE,
 
 		// Lexer + Interpreter
-		BRACKET_CURLY_OPEN, BRACKET_CURLY_CLOSE,
 		NAME,
 		EQ, UNEQ,
 		BIGGER, LESS,
@@ -29,15 +30,19 @@ namespace base {
 		ASSIGN,
 
 		// Interpreter
+		BEGIN_SCOPE, END_SCOPE,
 		END_PROGRAM,
 		LOAD, STORE,
-		JUMP, JUMP_IF,
+		JUMP, JUMP_IF_NOT,
 		CREATE, POP,
 	};
 
 	OpCode opCodeFromKeyword(const std::string_view keyword) {
 		if (keyword == "if") return OpCode::IF;
 		if (keyword == "else") return OpCode::ELSE;
+		if (keyword == "while") return OpCode::WHILE;
+		if (keyword == "continue") return OpCode::CONTINUE;
+		if (keyword == "break") return OpCode::BREAK;
 		return OpCode::ERR;
 	}
 
@@ -134,7 +139,7 @@ namespace base {
 
 			// Parser only
 			SM_REGISTER_NAME(OpCode::JUMP_LABEL);
-			SM_REGISTER_NAME(OpCode::JUMP_LABEL_IF);
+			SM_REGISTER_NAME(OpCode::JUMP_LABEL_IF_NOT);
 			SM_REGISTER_NAME(OpCode::LABEL);
 
 			// Lexer
@@ -143,14 +148,19 @@ namespace base {
 			SM_REGISTER_NAME(OpCode::LITERAL);
 			SM_REGISTER_NAME(OpCode::IF);
 			SM_REGISTER_NAME(OpCode::ELSE);
+			SM_REGISTER_NAME(OpCode::WHILE);
+			SM_REGISTER_NAME(OpCode::CONTINUE);
+			SM_REGISTER_NAME(OpCode::BREAK);
 			SM_REGISTER_NAME(OpCode::BRACKET_ROUND_OPEN);
 			SM_REGISTER_NAME(OpCode::BRACKET_ROUND_CLOSE);
 			SM_REGISTER_NAME(OpCode::BRACKET_SQUARE_OPEN);
 			SM_REGISTER_NAME(OpCode::BRACKET_SQUARE_CLOSE);
-
-			// Lexer + Interpreter
 			SM_REGISTER_NAME(OpCode::BRACKET_CURLY_OPEN);
 			SM_REGISTER_NAME(OpCode::BRACKET_CURLY_CLOSE);
+
+			// Lexer + Interpreter
+			SM_REGISTER_NAME(OpCode::BEGIN_SCOPE);
+			SM_REGISTER_NAME(OpCode::END_SCOPE);
 			SM_REGISTER_NAME(OpCode::NAME);
 			SM_REGISTER_NAME(OpCode::EQ);
 			SM_REGISTER_NAME(OpCode::UNEQ);
@@ -169,7 +179,7 @@ namespace base {
 			SM_REGISTER_NAME(OpCode::LOAD);
 			SM_REGISTER_NAME(OpCode::STORE);
 			SM_REGISTER_NAME(OpCode::JUMP);
-			SM_REGISTER_NAME(OpCode::JUMP_IF);
+			SM_REGISTER_NAME(OpCode::JUMP_IF_NOT);
 			SM_REGISTER_NAME(OpCode::CREATE);
 			SM_REGISTER_NAME(OpCode::POP);
 		}

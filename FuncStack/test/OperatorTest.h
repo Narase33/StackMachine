@@ -12,11 +12,10 @@ namespace operatorTest {
 	void test(std::string&& expression, base::BasicType expected) {
 		SECTION(expression) {
 			try {
-				compiler::Compiler compiler(std::move(expression));
+				Compiler compiler(std::move(expression));
 				REQUIRE(compiler.isSuccessful());
 
 				StackMachine machine(compiler.getProgram());
-
 				INFO(machine.toString());
 
 				const auto result = machine.exec();

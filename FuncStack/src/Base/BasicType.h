@@ -144,6 +144,18 @@ namespace base {
 			return BasicType(!a.getBool());
 		}
 
+		friend BasicType operator<(const BasicType& a, const BasicType& b) noexcept {
+			return std::visit([](const auto& a, const auto& b) {
+				return BasicType(a < b);
+			}, a.inner, b.inner);
+		}
+
+		friend BasicType operator>(const BasicType& a, const BasicType& b) noexcept {
+			return std::visit([](const auto& a, const auto& b) {
+				return BasicType(a > b);
+			}, a.inner, b.inner);
+		}
+
 		friend BasicType operator==(const BasicType& a, const BasicType& b) noexcept {
 			if (a.typeId() != b.typeId()) {
 				return BasicType(false);
