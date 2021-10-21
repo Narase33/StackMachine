@@ -8,23 +8,95 @@
 
 #include "Token.h"
 
-#include "src/Utils/Stream.h"
 #include "src/Exception.h"
-
 #include "src/Base/Source.h"
 
 namespace compiler {
-	class ShuntingYard {
-		struct LoopLabels { size_t head, end, scopeLevel; };
+	class ScopeDict {
+	public:
+		struct LoopLayer {
+			size_t level, head, end;
+		};
 
+		struct Variable {
+			size_t level;
+			std::string name;
+		};
+
+		ScopeDict() = default;
+
+		void pushScope() {
+			scopeLevel++;
+		}
+
+		void popScope() {
+			const auto pos = std::find_if(variables.begin(), variables.end(), [=](const Variable& v) {
+				return v.level == scopeLevel;
+			});
+			variables.erase(pos, variables.end());
+			scopeLevel--;
+		}
+
+		void pushLoop(size_t headLabel, size_t endLabel) {
+			loops.push_back({ scopeLevel, headLabel, endLabel });
+		}
+
+		void popLoop() {
+			loops.pop_back();
+		}
+
+		bool pushVariable(const std::string& variableName) {
+			if (hasVariable(variableName)) {
+				return false;
+			}
+
+			variables.push_back({ scopeLevel, variableName });
+		}
+
+		std::optional<size_t> offsetVariable(const std::string& variableName) const {
+			const auto pos = _getVariableIt(variableName);
+			if (pos != variables.end()) {
+				return std::distance(variables.begin(), pos);
+			}
+			return {};
+		}
+
+		bool hasVariable(const std::string& variableName) const {
+			return _getVariableIt(variableName) != variables.end();
+		}
+
+		std::optional<LoopLayer> loopLabelFromOffset(size_t offset) const {
+			if (loops.size() < offset) {
+				return {};
+			}
+
+			return loops[loops.size() - 1 - offset];
+		}
+
+		size_t level() const {
+			return scopeLevel;
+		}
+
+	private:
+		std::vector<LoopLayer> loops;
+		std::vector<Variable> variables;
+		size_t scopeLevel = 0;
+
+		const std::vector<Variable>::const_iterator _getVariableIt(const std::string& name) const {
+			return std::find_if(variables.begin(), variables.end(), [&](const Variable& v) {
+				return v.name == name;
+			});
+		}
+	};
+
+	class ShuntingYard {
 		using Iterator = std::vector<Token>::const_iterator;
 
 		const base::Source& source;
 		const Iterator _end;
 		Iterator _current;
 
-		size_t currentScopeLevel = 0;
-		std::stack<LoopLabels, std::vector<LoopLabels>> loopLabels;
+		ScopeDict scope;
 
 		std::list<base::Operation> program;
 		bool success = true;
@@ -33,6 +105,14 @@ namespace compiler {
 			if (!condition) {
 				throw ex::ParserException(message, pos);
 			}
+		}
+
+		void assume(bool condition, const std::string& message, const Token& t) const {
+			assume(condition, message, t.pos);
+		}
+
+		void assume(bool condition, const std::string& message, std::vector<Token>::const_iterator it) const {
+			assume(condition, message, it->pos);
 		}
 
 		void assume_isOperator(base::OpCode is, base::OpCode should, size_t pos) const {
@@ -174,9 +254,9 @@ namespace compiler {
 			const Iterator beginBody = unwindGroup(begin, end);
 
 			program.push_back(base::Operation(base::OpCode::BEGIN_SCOPE));
-			currentScopeLevel++;
+			scope.pushScope();
 			compileBlock(beginBody + 1, begin);
-			currentScopeLevel--;
+			scope.popScope();
 			program.push_back(base::Operation(base::OpCode::END_SCOPE));
 
 			begin++;
@@ -242,13 +322,48 @@ namespace compiler {
 			program.push_back(base::Operation(base::OpCode::JUMP_LABEL_IF_NOT, base::StackFrame(base::BasicType(endLabel))));
 
 			assume_isOperator(begin->id, base::OpCode::BRACKET_CURLY_OPEN, begin->pos);
-			loopLabels.push({ headLabel, endLabel, currentScopeLevel });
+			scope.pushLoop(headLabel, endLabel);
 			insertCurlyBrackets(begin, end);
-			loopLabels.pop();
+			scope.popLoop();
 
 			program.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::StackFrame(base::BasicType(headLabel))));
 
 			program.push_back(base::Operation(base::OpCode::LABEL, base::StackFrame(base::BasicType(endLabel))));
+		}
+
+		void jumpOutOfLoop(Iterator& current, std::function<size_t(const ScopeDict::LoopLayer&)> which) {
+			size_t levelsToJump = 0;
+			const Iterator next = current + 1;
+			if (next->id == base::OpCode::LITERAL) {
+				assume(std::holds_alternative<base::sm_int>(next->value), "expected number after keyword", current);
+				levelsToJump = std::get<base::sm_int>(next->value) - 1;
+				assume(levelsToJump > 0, "jump levels must be > 0", current);
+				current++;
+			}
+			
+			const auto loopLabels = scope.loopLabelFromOffset(levelsToJump);
+			assume(loopLabels.has_value(), "cannot jump to outer loop, there is no", current);
+			current++;
+
+			for (int i = 0; i < scope.level() - loopLabels.value().level; i++) {
+				program.push_back(base::Operation(base::OpCode::END_SCOPE));
+			}
+
+			program.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::StackFrame(base::BasicType(which(loopLabels.value())))));
+			assume(current->id == base::OpCode::END_STATEMENT, "Missing end statement", current);
+			current++;
+		}
+
+		void execute_continue(Iterator& current) {
+			jumpOutOfLoop(current, [](const ScopeDict::LoopLayer& l) {
+				return l.head;
+			});
+		}
+
+		void execute_break(Iterator& current) {
+			jumpOutOfLoop(current, [](const ScopeDict::LoopLayer& l) {
+				return l.end;
+			});
 		}
 
 		void embeddCodeStatement(Iterator& begin, Iterator end) {
@@ -260,7 +375,6 @@ namespace compiler {
 			program.splice(program.end(), shuntingYard(begin, endStatementIt));
 			begin = endStatementIt + 1;
 		}
-
 
 		void compileBlock(Iterator begin, Iterator end) {
 			try {
@@ -294,22 +408,10 @@ namespace compiler {
 							parse_while(begin, end);
 							break;
 						case base::OpCode::CONTINUE:
-							for (int i = 0; i < currentScopeLevel - loopLabels.top().scopeLevel; i++) {
-								program.push_back(base::Operation(base::OpCode::END_SCOPE));
-							}
-							program.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::StackFrame(base::BasicType(loopLabels.top().head))));
-							begin++;
-							assume(begin->id == base::OpCode::END_STATEMENT, "Missing end statement", begin->pos);
-							begin++;
+							execute_continue(begin);
 							break;
 						case base::OpCode::BREAK:
-							for (int i = 0; i < currentScopeLevel - loopLabels.top().scopeLevel; i++) {
-								program.push_back(base::Operation(base::OpCode::END_SCOPE));
-							}
-							program.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::StackFrame(base::BasicType(loopLabels.top().end))));
-							begin++;
-							assume(begin->id == base::OpCode::END_STATEMENT, "Missing end statement", begin->pos);
-							begin++;
+							execute_break(begin);
 							break;
 						case base::OpCode::BRACKET_CURLY_OPEN:
 							insertCurlyBrackets(begin, end);

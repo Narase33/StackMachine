@@ -153,5 +153,39 @@ namespace controlFlowTest {
 			"	i++;\n"
 			"}";
 		test_variable(std::move(code), { {"i", BasicType(5)}, {"k", BasicType(25)} });
+
+		// Multi level break
+		code =
+			"int i = 0;\n"
+			"int k = 0;\n"
+			"while (i < 5) {\n"
+			"	int j = 0;\n"
+			"	while (j < 5) {\n"
+			"		k++;\n"
+			"		j++;\n"
+			"		if (k == 8) {\n"
+			"			break 2;\n"
+			"		}\n"
+			"	}\n"
+			"	i++;\n"
+			"}";
+		test_variable(std::move(code), { {"i", BasicType(1)}, {"k", BasicType(8)} });
+
+		// Multi level continue
+		code =
+			"int i = 0;\n"
+			"int k = 0;\n"
+			"while (i < 5) {\n"
+			"	int j = 0;\n"
+			"	i++;\n"
+			"	while (j < 5) {\n"
+			"		j++;\n"
+			"		if (k == 8) {\n"
+			"			continue 2;\n"
+			"		}\n"
+			"		k++;\n"
+			"	}\n"
+			"}";
+		test_variable(std::move(code), { {"i", BasicType(5)}, {"k", BasicType(8)} });
 	}
 }
