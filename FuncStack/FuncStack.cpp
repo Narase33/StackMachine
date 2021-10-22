@@ -29,7 +29,6 @@ int main(int argc, char* argv[]) {
 	const int testReturn = session.run(argc, argv);
 
 	printSize<base::Operation>("Operation");
-	printSize<base::StackFrame>("StackFrame");
 	printSize<base::BasicType>("BasicType");
 
 	return testReturn;

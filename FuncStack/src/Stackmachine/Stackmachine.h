@@ -38,38 +38,38 @@ namespace stackmachine {
 			return dataStack.size();
 		}
 
-		std::optional<base::StackFrame> exec() {
+		void exec() {
 			while (pc->getOpCode() != base::OpCode::END_PROGRAM) {
 				switch (pc->getOpCode()) {
 					// ==== META ====
 					case base::OpCode::LITERAL:
-						dataStack.push_back(pc->value().getValue()); break;
+						dataStack.push_back(pc->value()); break;
 					case base::OpCode::STORE:
 					{
 						base::BasicType variableValue = pop();
-						setVariable(pc->value().getValue().getUint(), std::move(variableValue));
+						setVariable(pc->value().getUint(), std::move(variableValue));
 					}
 					break;
 					case base::OpCode::LOAD:
 					{
-						base::BasicType variableValue = getVariable(pc->value().getValue().getUint());
+						base::BasicType variableValue = getVariable(pc->value().getUint());
 						dataStack.push_back(std::move(variableValue));
 					}
 					break;
 					case base::OpCode::CREATE:
 					{
-						const base::sm_uint typeId = pc->value().getValue().getUint();
+						const base::sm_uint typeId = pc->value().getUint();
 						dataStack.push_back(base::BasicType::fromId(static_cast<base::TypeIndex>(typeId)));
 					}
 					break;
 					case base::OpCode::POP:
 						pop(); break;
 					case base::OpCode::JUMP:
-						pc += pc->value().getValue().getInt() - 1; // loop will increment +1
+						pc += pc->value().getInt() - 1; // loop will increment +1
 						break;
 					case base::OpCode::JUMP_IF_NOT:
 						if (pop().getBool() == false) {
-							pc += pc->value().getValue().getInt() - 1; // loop will increment +1
+							pc += pc->value().getInt() - 1; // loop will increment +1
 						}
 						break;
 					case base::OpCode::BEGIN_SCOPE:
@@ -106,21 +106,33 @@ namespace stackmachine {
 				}
 				pc++;
 			}
-
-			return dataStack.empty() ? std::optional<base::StackFrame>(std::nullopt) : std::optional<base::StackFrame>(dataStack.back());
 		}
 
 		std::string toString() const {
 			std::ostringstream stream;
 
 			stream << "Programm:" << std::endl;
-			for (const base::Operation& i : programm) {
-				std::string opValue;
+			for (int i = 0; i < programm.size(); i++) {
+				base::OpCode opCode = programm[i].getOpCode();
+				base::BasicType value = programm[i].value();
 
-				const base::StackFrame& value1 = i.value();
-				opValue = value1.isVariable() ? value1.getName() : value1.getValue().toString();
+				stream << std::setw(3) << std::right << i << " | " << std::setw(20) << std::left << opCodeName(opCode) << " ";
+				switch (opCode) {
+					case base::OpCode::CREATE:
+						stream << value.toString() << " (" << idToString(static_cast<base::TypeIndex>(value.getUint())) << ")";
+						break;
+					case base::OpCode::JUMP: // fallthrough
+					case base::OpCode::JUMP_IF_NOT:
+						stream << value.toString() << " (" << (i + value.getInt()) << ")";
+						break;
+					case base::OpCode::LITERAL: // fallthrough
+					case base::OpCode::STORE: // fallthrough
+					case base::OpCode::LOAD:
+						stream << value.toString();
+						break;
+				}
 
-				stream << "\t" << std::setw(20) << std::left << opCodeName(i.getOpCode()) << " " << opValue << std::endl;
+				stream << "\n";
 			}
 
 			return stream.str();

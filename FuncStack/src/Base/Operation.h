@@ -1,28 +1,28 @@
 #pragma once
 
 #include "OpCode.h"
-#include "StackFrame.h"
+#include "BasicType.h"
 
 namespace base {
 	struct Operation final {
-		explicit Operation(OpCode opCode, StackFrame value) :
-			_opCode(opCode), _value1(std::move(value)) {
+		explicit Operation(OpCode opCode, BasicType value) :
+			_opCode(opCode), _value(std::move(value)) {
 		}
 
 		explicit Operation(OpCode opCode) :
-			_opCode(opCode), _value1("") {
+			_opCode(opCode) {
 		}
 
 		explicit Operation() :
-			_opCode(OpCode::ERR), _value1("") {
+			_opCode(OpCode::ERR) {
 		}
 
-		const StackFrame& value() const {
-			return _value1;
+		const BasicType& value() const {
+			return _value;
 		}
 
-		StackFrame& value() {
-			return _value1;
+		BasicType& value() {
+			return _value;
 		}
 
 		OpCode getOpCode() const {
@@ -31,6 +31,6 @@ namespace base {
 
 	private:
 		OpCode _opCode;
-		StackFrame _value1;
+		BasicType _value;
 	};
 }

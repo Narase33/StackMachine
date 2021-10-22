@@ -83,13 +83,13 @@ namespace compiler {
 		base::Operation createStoreOperation(Iterator it) const {
 			const std::optional<size_t> variableOffset = offsetVariable(std::get<std::string>(it->value));
 			assume(variableOffset.has_value(), "Variable not declared", it);
-			return base::Operation(base::OpCode::STORE, base::StackFrame(base::BasicType(variableOffset.value())));
+			return base::Operation(base::OpCode::STORE, base::BasicType(variableOffset.value()));
 		}
 
 		base::Operation createLoadOperation(Iterator it) const {
 			const std::optional<size_t> variableOffset = offsetVariable(std::get<std::string>(it->value));
 			assume(variableOffset.has_value(), "used variable not declared", it);
-			return base::Operation(base::OpCode::LOAD, base::StackFrame(base::BasicType(variableOffset.value())));
+			return base::Operation(base::OpCode::LOAD, base::BasicType(variableOffset.value()));
 		}
 
 	private:
@@ -260,7 +260,7 @@ namespace compiler {
 						program.push_back(base::Operation(opCode));
 						break;
 					case base::OpCode::LITERAL:
-						program.push_back(base::Operation(base::OpCode::LITERAL, base::StackFrame(base::BasicType(literalToValue(it->value)))));
+						program.push_back(base::Operation(base::OpCode::LITERAL, base::BasicType(literalToValue(it->value))));
 						break;
 					case base::OpCode::NAME:
 					{
@@ -296,20 +296,20 @@ namespace compiler {
 			insertRoundBrackets(begin, end);
 
 			const size_t jumpOverIndex = nextIndex();
-			program.emplace_back(base::OpCode::JUMP_LABEL_IF_NOT, base::StackFrame(base::BasicType(jumpOverIndex))); // jump over if
+			program.emplace_back(base::OpCode::JUMP_LABEL_IF_NOT, base::BasicType(jumpOverIndex)); // jump over if
 
 			assume_isOperator(begin->id, base::OpCode::BRACKET_CURLY_OPEN, begin->pos);
 			insertCurlyBrackets(begin, end);
 
-			program.emplace_back(base::OpCode::JUMP_LABEL, base::StackFrame(base::BasicType(jumpToEndIndex))); // jump to end
-			program.emplace_back(base::OpCode::LABEL, base::StackFrame(base::BasicType(jumpOverIndex))); // after if label
+			program.emplace_back(base::OpCode::JUMP_LABEL, base::BasicType(jumpToEndIndex)); // jump to end
+			program.emplace_back(base::OpCode::LABEL, base::BasicType(jumpOverIndex)); // after if label
 		}
 
 		void parse_if(Iterator& begin, Iterator end) {
 			begin++; // "if"
 			const size_t jumpToEndIndex = nextIndex();
 			insert_if_base(begin, end, jumpToEndIndex);
-			program.emplace_back(base::OpCode::LABEL, base::StackFrame(base::BasicType(jumpToEndIndex))); // set end label
+			program.emplace_back(base::OpCode::LABEL, base::BasicType(jumpToEndIndex)); // set end label
 		}
 
 		void parse_else(Iterator& begin, Iterator end) {
@@ -321,7 +321,7 @@ namespace compiler {
 			if (begin->id == base::OpCode::IF) {
 				begin++;
 
-				const size_t jumpToEndIndex = jumpToEndLabel.value().getValue().getUint();
+				const size_t jumpToEndIndex = jumpToEndLabel.value().getUint();
 				insert_if_base(begin, end, jumpToEndIndex);
 			} else {
 				assume_isOperator(begin->id, base::OpCode::BRACKET_CURLY_OPEN, begin->pos);
@@ -337,21 +337,21 @@ namespace compiler {
 			const size_t headLabel = nextIndex();
 			const size_t endLabel = nextIndex();
 
-			program.push_back(base::Operation(base::OpCode::LABEL, base::StackFrame(base::BasicType(headLabel))));
+			program.push_back(base::Operation(base::OpCode::LABEL, base::BasicType(headLabel)));
 
 			assume_isOperator(begin->id, base::OpCode::BRACKET_ROUND_OPEN, begin->pos);
 			insertRoundBrackets(begin, end);
 
-			program.push_back(base::Operation(base::OpCode::JUMP_LABEL_IF_NOT, base::StackFrame(base::BasicType(endLabel))));
+			program.push_back(base::Operation(base::OpCode::JUMP_LABEL_IF_NOT, base::BasicType(endLabel)));
 
 			assume_isOperator(begin->id, base::OpCode::BRACKET_CURLY_OPEN, begin->pos);
 			scope.pushLoop(headLabel, endLabel);
 			insertCurlyBrackets(begin, end);
 			scope.popLoop();
 
-			program.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::StackFrame(base::BasicType(headLabel))));
+			program.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::BasicType(headLabel)));
 
-			program.push_back(base::Operation(base::OpCode::LABEL, base::StackFrame(base::BasicType(endLabel))));
+			program.push_back(base::Operation(base::OpCode::LABEL, base::BasicType(endLabel)));
 		}
 
 		void jumpOutOfLoop(Iterator& current, std::function<size_t(const ScopeDict::LoopLayer&)> which) {
@@ -372,7 +372,7 @@ namespace compiler {
 				program.push_back(base::Operation(base::OpCode::END_SCOPE));
 			}
 
-			program.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::StackFrame(base::BasicType(which(loopLabels.value())))));
+			program.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::BasicType(which(loopLabels.value()))));
 			assume(current->id == base::OpCode::END_STATEMENT, "Missing end statement", current);
 			current++;
 		}
@@ -406,7 +406,7 @@ namespace compiler {
 						case base::OpCode::TYPE:
 						{
 							assert(!std::holds_alternative<std::monostate>(begin->value));
-							base::StackFrame variableType(literalToValue(begin->value));
+							base::BasicType variableType = literalToValue(begin->value);
 							begin++;
 							
 							assume(std::holds_alternative<std::string>(begin->value), "Missing variable name after type declaration", begin);

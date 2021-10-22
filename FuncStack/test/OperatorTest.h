@@ -17,10 +17,10 @@ namespace operatorTest {
 
 				StackMachine machine(compiler.getProgram());
 				INFO(machine.toString());
+				machine.exec();
 
-				const auto result = machine.exec();
-				REQUIRE(result.has_value());
-				REQUIRE((result.value().getValue() == expected).getBool());
+				REQUIRE(machine.getDataStack().size() == 1);
+				REQUIRE((machine.getVariable(0) == expected).getBool());
 			} catch (const std::exception& e) {
 				FAIL(e.what());
 			}
@@ -28,11 +28,11 @@ namespace operatorTest {
 	}
 
 	TEST_CASE("Operator-Test") {
-		test("6 + 2;", base::BasicType(8));
-		test("6 - 2;", base::BasicType(4));
-		test("6 * 2;", base::BasicType(12));
-		test("6 / 2;", base::BasicType(3));
-		test("6++;", base::BasicType(7));
-		test("6--;", base::BasicType(5));
+		test("int i = 6 + 2;", base::BasicType(8));
+		test("int i = 6 - 2;", base::BasicType(4));
+		test("int i = 6 * 2;", base::BasicType(12));
+		test("int i = 6 / 2;", base::BasicType(3));
+		test("int i = 6++;", base::BasicType(7));
+		test("int i = 6--;", base::BasicType(5));
 	}
 }
