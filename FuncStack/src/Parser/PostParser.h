@@ -33,7 +33,7 @@ namespace compiler {
 				switch (it->getOpCode()) {
 					case base::OpCode::LABEL:
 					{
-						const size_t labelId = it->firstValue().getValue().getUint();
+						const size_t labelId = it->value().getValue().getUint();
 
 						for (JumpPoint& jumpPoint : jumps[labelId]) {
 							const base::OpCode op = jumpPoint.frame->getOpCode();
@@ -55,7 +55,7 @@ namespace compiler {
 					case base::OpCode::JUMP_LABEL: // fallthrough
 					case base::OpCode::JUMP_LABEL_IF_NOT:
 					{
-						const size_t labelId = it->firstValue().getValue().getUint();
+						const size_t labelId = it->value().getValue().getUint();
 
 						const auto jumpDestination = labels.find(labelId);
 						if (jumpDestination != labels.end()) {
@@ -86,7 +86,7 @@ namespace compiler {
 
 			for (JumpPoint& jump : optimizedJumps) {
 				if (jumpsOver(jump, pos)) {
-					base::sm_int& jumpDistance = jump.frame->firstValue().getValue().getInt();
+					base::sm_int& jumpDistance = jump.frame->value().getValue().getInt();
 					jumpDistance += (jumpDistance > 0) ? -1 : +1;
 					// TODO recursive
 				}
@@ -95,7 +95,7 @@ namespace compiler {
 
 		bool jumpsOver(const JumpPoint& jump, size_t pos) const {
 			const size_t from = jump.pos;
-			const size_t to = jump.pos + jump.frame->firstValue().getValue().getInt();
+			const size_t to = jump.pos + jump.frame->value().getValue().getInt();
 			auto [min, max] = std::minmax(from, to);
 			return (min < pos) && (pos < max);
 		}

@@ -13,6 +13,8 @@
 
 namespace compiler {
 	class ScopeDict {
+		using Iterator = std::vector<Token>::const_iterator;
+
 	public:
 		struct LoopLayer {
 			size_t level, head, end;
@@ -51,6 +53,7 @@ namespace compiler {
 			}
 
 			variables.push_back({ scopeLevel, variableName });
+			return true;
 		}
 
 		std::optional<size_t> offsetVariable(const std::string& variableName) const {
@@ -77,6 +80,18 @@ namespace compiler {
 			return scopeLevel;
 		}
 
+		base::Operation createStoreOperation(Iterator it) const {
+			const std::optional<size_t> variableOffset = offsetVariable(std::get<std::string>(it->value));
+			assume(variableOffset.has_value(), "Variable not declared", it);
+			return base::Operation(base::OpCode::STORE, base::StackFrame(base::BasicType(variableOffset.value())));
+		}
+
+		base::Operation createLoadOperation(Iterator it) const {
+			const std::optional<size_t> variableOffset = offsetVariable(std::get<std::string>(it->value));
+			assume(variableOffset.has_value(), "used variable not declared", it);
+			return base::Operation(base::OpCode::LOAD, base::StackFrame(base::BasicType(variableOffset.value())));
+		}
+
 	private:
 		std::vector<LoopLayer> loops;
 		std::vector<Variable> variables;
@@ -86,6 +101,12 @@ namespace compiler {
 			return std::find_if(variables.begin(), variables.end(), [&](const Variable& v) {
 				return v.name == name;
 			});
+		}
+
+		void assume(bool condition, const std::string& message, Iterator it) const {
+			if (!condition) {
+				throw ex::ParserException(message, it->pos);
+			}
 		}
 	};
 
@@ -222,9 +243,9 @@ namespace compiler {
 					{
 						program.push_back(base::Operation(opCode));
 
-						const Token& prev = *(it - 1);
-						if (prev.id == base::OpCode::NAME) {
-							program.push_back(base::Operation(base::OpCode::STORE, base::StackFrame(std::get<std::string>(prev.value))));
+						const Iterator prev = it - 1;
+						if (prev->id == base::OpCode::NAME) {
+							program.push_back(scope.createStoreOperation(prev));
 						}
 					}
 					break;
@@ -239,10 +260,12 @@ namespace compiler {
 						program.push_back(base::Operation(opCode));
 						break;
 					case base::OpCode::LITERAL:
-						program.push_back(base::Operation(base::OpCode::LOAD, base::StackFrame(base::BasicType(literalToValue(it->value)))));
+						program.push_back(base::Operation(base::OpCode::LITERAL, base::StackFrame(base::BasicType(literalToValue(it->value)))));
 						break;
 					case base::OpCode::NAME:
-						program.push_back(base::Operation(base::OpCode::LOAD, base::StackFrame(std::get<std::string>(it->value))));
+					{
+						program.push_back(scope.createLoadOperation(it));
+					}
 						break;
 				}
 			}
@@ -298,7 +321,7 @@ namespace compiler {
 			if (begin->id == base::OpCode::IF) {
 				begin++;
 
-				const size_t jumpToEndIndex = jumpToEndLabel.firstValue().getValue().getUint();
+				const size_t jumpToEndIndex = jumpToEndLabel.value().getValue().getUint();
 				insert_if_base(begin, end, jumpToEndIndex);
 			} else {
 				assume_isOperator(begin->id, base::OpCode::BRACKET_CURLY_OPEN, begin->pos);
@@ -382,18 +405,25 @@ namespace compiler {
 					switch (begin->id) {
 						case base::OpCode::TYPE:
 						{
+							assert(!std::holds_alternative<std::monostate>(begin->value));
 							base::StackFrame variableType(literalToValue(begin->value));
 							begin++;
-							base::StackFrame variableName(std::get<std::string>(begin->value));
-							program.push_back(base::Operation(base::OpCode::CREATE, std::move(variableType), std::move(variableName)));
+							
+							assume(std::holds_alternative<std::string>(begin->value), "Missing variable name after type declaration", begin);
+							std::string variableName = std::get<std::string>(begin->value);
+							const bool unknownVariable = scope.pushVariable(variableName);
+							assume(unknownVariable, "Variable already defined", begin->pos);
+
+							program.push_back(base::Operation(base::OpCode::CREATE, std::move(variableType)));
 						}
 						break;
 						case base::OpCode::NAME:
 							if ((begin + 1)->id == base::OpCode::ASSIGN) {
-								std::string variableName = std::get<std::string>(begin->value);
+								assert(std::holds_alternative<std::string>(begin->value));
+								base::Operation storeOperation = scope.createStoreOperation(begin);
 								begin += 2;
 								embeddCodeStatement(begin, end);
-								program.push_back(base::Operation(base::OpCode::STORE, base::StackFrame(std::move(variableName))));
+								program.push_back(std::move(storeOperation));
 							} else {
 								embeddCodeStatement(begin, end);
 							}

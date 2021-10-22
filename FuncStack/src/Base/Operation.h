@@ -5,36 +5,24 @@
 
 namespace base {
 	struct Operation final {
-		explicit Operation(OpCode opCode, StackFrame value1, StackFrame value2) :
-			_opCode(opCode), _value1(std::move(value1)), _value2(std::move(value2)) {
-		}
-
 		explicit Operation(OpCode opCode, StackFrame value) :
-			_opCode(opCode), _value1(std::move(value)), _value2("") {
+			_opCode(opCode), _value1(std::move(value)) {
 		}
 
 		explicit Operation(OpCode opCode) :
-			_opCode(opCode), _value1(""), _value2("") {
+			_opCode(opCode), _value1("") {
 		}
 
 		explicit Operation() :
-			_opCode(OpCode::ERR), _value1(""), _value2("") {
+			_opCode(OpCode::ERR), _value1("") {
 		}
 
-		const StackFrame& firstValue() const {
+		const StackFrame& value() const {
 			return _value1;
 		}
 
-		StackFrame& firstValue() {
+		StackFrame& value() {
 			return _value1;
-		}
-
-		const StackFrame& secondValue() const {
-			return _value2;
-		}
-
-		StackFrame& secondValue() {
-			return _value2;
 		}
 
 		OpCode getOpCode() const {
@@ -44,6 +32,5 @@ namespace base {
 	private:
 		OpCode _opCode;
 		StackFrame _value1;
-		StackFrame _value2;
 	};
 }

@@ -87,7 +87,7 @@ namespace base {
 
 		std::string toString() const {
 			std::ostringstream o;
-			o << *this;
+			std::visit([&](const auto& a) { o << a; }, inner);
 			return o.str();
 		}
 

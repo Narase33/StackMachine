@@ -12,7 +12,6 @@ namespace base {
 
 		// Lexer
 		END_STATEMENT,
-		LITERAL,
 		IF, ELSE, WHILE,
 		CONTINUE, BREAK,
 		BRACKET_ROUND_OPEN, BRACKET_ROUND_CLOSE,
@@ -21,6 +20,7 @@ namespace base {
 		TYPE,
 
 		// Lexer + Interpreter
+		LITERAL,
 		NAME,
 		EQ, UNEQ,
 		BIGGER, LESS,
@@ -145,7 +145,6 @@ namespace base {
 			// Lexer
 			SM_REGISTER_NAME(OpCode::TYPE);
 			SM_REGISTER_NAME(OpCode::END_STATEMENT);
-			SM_REGISTER_NAME(OpCode::LITERAL);
 			SM_REGISTER_NAME(OpCode::IF);
 			SM_REGISTER_NAME(OpCode::ELSE);
 			SM_REGISTER_NAME(OpCode::WHILE);
@@ -159,6 +158,7 @@ namespace base {
 			SM_REGISTER_NAME(OpCode::BRACKET_CURLY_CLOSE);
 
 			// Lexer + Interpreter
+			SM_REGISTER_NAME(OpCode::LITERAL);
 			SM_REGISTER_NAME(OpCode::BEGIN_SCOPE);
 			SM_REGISTER_NAME(OpCode::END_SCOPE);
 			SM_REGISTER_NAME(OpCode::NAME);
