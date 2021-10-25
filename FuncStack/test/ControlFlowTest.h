@@ -52,6 +52,12 @@ namespace controlFlowTest {
 		}
 	}
 
+	void test_compileFail(std::string&& expression) {
+		SECTION(expression) {
+			REQUIRE_THROWS(Compiler(std::move(expression)));
+		}
+	}
+
 	TEST_CASE("ControlFlow-Test-if") {
 		// Basic
 		test_dataStack("int i = 0; if ( true ) { i = 2; }", BasicType(2));
@@ -79,6 +85,10 @@ namespace controlFlowTest {
 		test_dataStack("int i = 0; if ( true ) { i = 1; } else if ( false ) { i = 2; } else if (true) {i = 3;} else { i = 4; }", BasicType(1));
 
 		test_dataStack("int i = 0; if ( true ) { i = 1; } else if ( true ) { i = 2; } else if (true) {i = 3;} else { i = 4; }", BasicType(1));
+
+		// Fails
+
+		test_compileFail("int i = 0; { i = 1} else {i=2};");
 	}
 
 	TEST_CASE("ControlFlow-Test-while") {

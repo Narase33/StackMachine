@@ -23,8 +23,8 @@ namespace base {
 		explicit BasicType(bool value) : inner((sm_bool)value) {}
 		explicit BasicType() {}
 
-		static BasicType fromId(TypeIndex id) {
-			switch (id) {
+		static BasicType fromId(TypeIndex opCode) {
+			switch (opCode) {
 				case TypeIndex::Int: return BasicType(sm_int{});
 				case TypeIndex::Uint: return BasicType(sm_uint{});
 				case TypeIndex::Float: return BasicType(sm_float{});

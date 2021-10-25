@@ -62,8 +62,6 @@ namespace stackmachine {
 						dataStack.push_back(base::BasicType::fromId(static_cast<base::TypeIndex>(typeId)));
 					}
 					break;
-					case base::OpCode::POP:
-						pop(); break;
 					case base::OpCode::JUMP:
 						pc += pc->value().getInt() - 1; // loop will increment +1
 						break;

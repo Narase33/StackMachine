@@ -73,9 +73,9 @@ namespace base {
 		return OpCode::ERR;
 	}
 
-	int opCodePriority(OpCode id) {
-		switch (id) {
-			case OpCode::LITERAL: return 0;
+	int opCodePriority(OpCode opCode) {
+		switch (opCode) {
+			case OpCode::LITERAL: return 1;
 			case OpCode::NAME: return 0;
 			case OpCode::BRACKET_ROUND_OPEN: return 0;
 			case OpCode::BRACKET_CURLY_OPEN: return 0;
@@ -92,6 +92,31 @@ namespace base {
 			case OpCode::DECR: return 5;
 		}
 		return -1;
+	}
+
+	int opCodeImpact(OpCode opCode) {
+		switch (opCode) {
+			case base::OpCode::LOAD:
+			case base::OpCode::NAME:
+			case base::OpCode::LITERAL: return 1;
+			case base::OpCode::JUMP:
+			case base::OpCode::JUMP_IF_NOT:
+			case base::OpCode::BEGIN_SCOPE:
+			case base::OpCode::END_SCOPE:
+			case base::OpCode::INCR:
+			case base::OpCode::DECR:
+			case base::OpCode::CREATE: return 0;
+			case base::OpCode::EQ:
+			case base::OpCode::UNEQ:
+			case base::OpCode::LESS:
+			case base::OpCode::BIGGER:
+			case base::OpCode::ADD:
+			case base::OpCode::SUB:
+			case base::OpCode::MULT:
+			case base::OpCode::DIV:
+			case base::OpCode::STORE: return -1;
+		}
+		throw ex::Exception("Unknown opCode " + std::to_string(static_cast<size_t>(opCode)));
 	}
 
 	std::pair<OpCode, OpCode> getBracketGroup(OpCode openBracket) {
@@ -131,8 +156,8 @@ namespace base {
 	}
 
 #define SM_REGISTER_NAME(x) case x: return #x
-	std::string opCodeName(OpCode id) {
-		switch (id) {
+	std::string opCodeName(OpCode opCode) {
+		switch (opCode) {
 			// Global
 			SM_REGISTER_NAME(OpCode::NOOP);
 			SM_REGISTER_NAME(OpCode::ERR);

@@ -13,8 +13,8 @@ namespace base {
 	};
 
 #define SM_REGISTER_NAME(x) case x: return #x
-	std::string idToString(TypeIndex id) {
-		switch (id) {
+	std::string idToString(TypeIndex opCode) {
+		switch (opCode) {
 			SM_REGISTER_NAME(TypeIndex::Err);
 			SM_REGISTER_NAME(TypeIndex::Int);
 			SM_REGISTER_NAME(TypeIndex::Uint);

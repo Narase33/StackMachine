@@ -690,7 +690,7 @@ constexpr auto operator "" _catch_sr( char const* rawChars, std::size_t size ) n
 #define CATCH_REC_OUT
 
 #define CATCH_EMPTY()
-#define CATCH_DEFER(id) id CATCH_EMPTY()
+#define CATCH_DEFER(opCode) opCode CATCH_EMPTY()
 
 #define CATCH_REC_GET_END2() 0, CATCH_REC_END
 #define CATCH_REC_GET_END1(...) CATCH_REC_GET_END2
@@ -10667,7 +10667,7 @@ namespace {
 #if defined( CATCH_CONFIG_WINDOWS_SEH )
 
 namespace Catch {
-    struct SignalDefs { DWORD id; const char* name; };
+    struct SignalDefs { DWORD opCode; const char* name; };
 
     // There is no 1-1 mapping between signals and windows exceptions.
     // Windows can easily distinguish between SO and SigSegV,
@@ -10681,7 +10681,7 @@ namespace Catch {
 
     LONG CALLBACK FatalConditionHandler::handleVectoredException(PEXCEPTION_POINTERS ExceptionInfo) {
         for (auto const& def : signalDefs) {
-            if (ExceptionInfo->ExceptionRecord->ExceptionCode == def.id) {
+            if (ExceptionInfo->ExceptionRecord->ExceptionCode == def.opCode) {
                 reportFatal(def.name);
             }
         }
