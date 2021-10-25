@@ -9,6 +9,7 @@
 #include "ScopeDict.h"
 
 #include "src/Base/Source.h"
+#include "src/Base/Program.h"
 
 namespace compiler {
 	class ShuntingYard {
@@ -20,7 +21,7 @@ namespace compiler {
 
 		ScopeDict scope;
 
-		std::list<base::Operation> program;
+		base::Program program;
 		bool success = true;
 
 		void assume(bool condition, const std::string& message, const Token& t) const {
@@ -85,7 +86,7 @@ namespace compiler {
 			assume(score == 1, "Plausibility check failed", *current);
 		}
 
-		std::list<base::Operation> shuntingYard(Iterator current, Iterator end) const {
+		std::vector<base::Operation> shuntingYard(Iterator current, Iterator end) {
 			const Iterator this_current_copy = current;
 
 			std::stack<Token, std::vector<Token>> operatorStack;
@@ -135,18 +136,18 @@ namespace compiler {
 
 			checkPlausibility(current, sortedTokens);
 
-			std::list<base::Operation> program;
+			std::vector<base::Operation> subProgram;
 			for (auto it = sortedTokens.begin(); it != sortedTokens.end(); it++) {
 				const base::OpCode opCode = it->opCode;
 				switch (opCode) {
 					case base::OpCode::INCR: // fallthrough
 					case base::OpCode::DECR:
 					{
-						program.push_back(base::Operation(opCode));
+						subProgram.push_back(base::Operation(opCode));
 
 						const Iterator prev = it - 1;
 						if (prev->opCode == base::OpCode::NAME) {
-							program.push_back(scope.createStoreOperation(prev));
+							subProgram.push_back(scope.createStoreOperation(prev));
 						}
 					}
 					break;
@@ -158,14 +159,14 @@ namespace compiler {
 					case base::OpCode::UNEQ: // fallthrough
 					case base::OpCode::BIGGER: // fallthrough
 					case base::OpCode::LESS:
-						program.push_back(base::Operation(opCode));
+						subProgram.push_back(base::Operation(opCode));
 						break;
 					case base::OpCode::LITERAL:
-						program.push_back(base::Operation(base::OpCode::LITERAL, base::BasicType(literalToValue(it))));
+						subProgram.push_back(base::Operation(base::OpCode::LITERAL, base::BasicType(program.addConstant(literalToValue(it)))));
 						break;
 					case base::OpCode::NAME:
 					{
-						program.push_back(scope.createLoadOperation(it));
+						subProgram.push_back(scope.createLoadOperation(it));
 					}
 					break;
 					default:
@@ -173,24 +174,24 @@ namespace compiler {
 				}
 			}
 
-			return program;
+			return subProgram;
 		}
 
 		void insertCurlyBrackets(Iterator& current, Iterator end) {
 			const Iterator beginBody = unwindGroup(current, end);
 
-			program.push_back(base::Operation(base::OpCode::BEGIN_SCOPE));
+			program.bytecode.push_back(base::Operation(base::OpCode::BEGIN_SCOPE));
 			scope.pushScope();
 			compileBlock(beginBody, current);
 			scope.popScope();
-			program.push_back(base::Operation(base::OpCode::END_SCOPE));
+			program.bytecode.push_back(base::Operation(base::OpCode::END_SCOPE));
 
 			current++;
 		}
 
 		void insertRoundBrackets(Iterator& current, Iterator end) {
 			const Iterator beginCondition = unwindGroup(current, end);
-			program.splice(program.end(), shuntingYard(beginCondition, current));
+			program.spliceBytecode(shuntingYard(beginCondition, current));
 			current++;
 		}
 
@@ -199,27 +200,27 @@ namespace compiler {
 			insertRoundBrackets(current, end);
 
 			const size_t jumpOverIndex = nextIndex();
-			program.emplace_back(base::OpCode::JUMP_LABEL_IF_NOT, base::BasicType(jumpOverIndex)); // jump over if
+			program.bytecode.emplace_back(base::OpCode::JUMP_LABEL_IF_NOT, base::BasicType(jumpOverIndex)); // jump over if
 
 			assume(current->opCode == base::OpCode::BRACKET_CURLY_OPEN, "Missing 'if' body", *current);
 			insertCurlyBrackets(current, end);
 
-			program.emplace_back(base::OpCode::JUMP_LABEL, base::BasicType(jumpToEndIndex)); // jump to end
-			program.emplace_back(base::OpCode::LABEL, base::BasicType(jumpOverIndex)); // after if label
+			program.bytecode.emplace_back(base::OpCode::JUMP_LABEL, base::BasicType(jumpToEndIndex)); // jump to end
+			program.bytecode.emplace_back(base::OpCode::LABEL, base::BasicType(jumpOverIndex)); // after if label
 		}
 
 		void parse_if(Iterator& current, Iterator end) {
 			current++; // "if"
 			const size_t jumpToEndIndex = nextIndex();
 			insert_if_base(current, end, jumpToEndIndex);
-			program.emplace_back(base::OpCode::LABEL, base::BasicType(jumpToEndIndex)); // set end label
+			program.bytecode.emplace_back(base::OpCode::LABEL, base::BasicType(jumpToEndIndex)); // set end label
 		}
 
 		void parse_else(Iterator& current, Iterator end) {
 			current++; // "else"
-			base::Operation jumpToEndLabel = program.back(); // retrieve 'else' end label
+			base::Operation jumpToEndLabel = program.bytecode.back(); // retrieve 'else' end label
 			assume(jumpToEndLabel.getOpCode() == base::OpCode::LABEL, "'else' declaration without previous 'if'", *current);
-			program.pop_back();
+			program.bytecode.pop_back();
 
 			if (current->opCode == base::OpCode::IF) {
 				current++;
@@ -231,7 +232,7 @@ namespace compiler {
 				insertCurlyBrackets(current, end);
 			}
 
-			program.push_back(std::move(jumpToEndLabel)); // put back 'else' end label
+			program.bytecode.push_back(std::move(jumpToEndLabel)); // put back 'else' end label
 		}
 
 		void parse_while(Iterator& current, Iterator end) {
@@ -240,21 +241,21 @@ namespace compiler {
 			const size_t headLabel = nextIndex();
 			const size_t endLabel = nextIndex();
 
-			program.push_back(base::Operation(base::OpCode::LABEL, base::BasicType(headLabel)));
+			program.bytecode.push_back(base::Operation(base::OpCode::LABEL, base::BasicType(headLabel)));
 
 			assume(current->opCode == base::OpCode::BRACKET_ROUND_OPEN, "Missing round brackets after 'while'", *current);
 			insertRoundBrackets(current, end);
 
-			program.push_back(base::Operation(base::OpCode::JUMP_LABEL_IF_NOT, base::BasicType(endLabel)));
+			program.bytecode.push_back(base::Operation(base::OpCode::JUMP_LABEL_IF_NOT, base::BasicType(endLabel)));
 
 			assume(current->opCode == base::OpCode::BRACKET_CURLY_OPEN, "'while' missing body", *current);
 			scope.pushLoop(headLabel, endLabel);
 			insertCurlyBrackets(current, end);
 			scope.popLoop();
 
-			program.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::BasicType(headLabel)));
+			program.bytecode.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::BasicType(headLabel)));
 
-			program.push_back(base::Operation(base::OpCode::LABEL, base::BasicType(endLabel)));
+			program.bytecode.push_back(base::Operation(base::OpCode::LABEL, base::BasicType(endLabel)));
 		}
 
 		void jumpOutOfLoop(Iterator& current, std::function<size_t(const ScopeDict::LoopLayer&)> which) {
@@ -272,10 +273,10 @@ namespace compiler {
 			current++;
 
 			for (int i = 0; i < scope.level() - loopLabels.value().level; i++) {
-				program.push_back(base::Operation(base::OpCode::END_SCOPE));
+				program.bytecode.push_back(base::Operation(base::OpCode::END_SCOPE));
 			}
 
-			program.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::BasicType(which(loopLabels.value()))));
+			program.bytecode.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::BasicType(which(loopLabels.value()))));
 			assume(current->opCode == base::OpCode::END_STATEMENT, "Missing end statement", *current);
 			current++;
 		}
@@ -298,7 +299,7 @@ namespace compiler {
 			});
 			assume(endStatementIt != end, "Missing end statement!", *current);
 
-			program.splice(program.end(), shuntingYard(current, endStatementIt));
+			program.spliceBytecode(shuntingYard(current, endStatementIt));
 			current = endStatementIt + 1;
 		}
 
@@ -317,7 +318,7 @@ namespace compiler {
 							const bool unknownVariable = scope.pushVariable(variableName);
 							assume(unknownVariable, "Variable already defined", *current);
 
-							program.push_back(base::Operation(base::OpCode::CREATE, std::move(variableType)));
+							program.bytecode.push_back(base::Operation(base::OpCode::CREATE, std::move(variableType)));
 						}
 						break;
 						case base::OpCode::NAME:
@@ -326,7 +327,7 @@ namespace compiler {
 								base::Operation storeOperation = scope.createStoreOperation(current);
 								current += 2;
 								embeddCodeStatement(current, end);
-								program.push_back(std::move(storeOperation));
+								program.bytecode.push_back(std::move(storeOperation));
 							} else {
 								embeddCodeStatement(current, end);
 							}
@@ -372,8 +373,9 @@ namespace compiler {
 			: _current(nodes.begin()), _end(nodes.end()), source(source) {
 		}
 
-		std::list<base::Operation> run() {
+		base::Program run() {
 			compileBlock(_current, _end);
+			program.bytecode.push_back(base::Operation(base::OpCode::END_PROGRAM));
 			return std::move(program);
 		}
 	};

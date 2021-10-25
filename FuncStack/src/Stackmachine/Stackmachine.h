@@ -4,18 +4,16 @@
 #include <sstream>
 #include <vector>
 
-#include "src/Base/Operation.h"
+#include "src/Base/Program.h"
 #include "src/Utils/Utils.h"
 #include "src/Exception.h"
 
 namespace stackmachine {
 	class StackMachine {
 	public:
-		StackMachine(const std::list<base::Operation>& toExecute) {
-			programm.reserve(toExecute.size() + 1);
-			std::copy(toExecute.begin(), toExecute.end(), std::back_inserter(programm));
-			programm.push_back(base::Operation(base::OpCode::END_PROGRAM));
-			pc = programm.begin();
+		StackMachine(base::Program toExecute)
+			: program(std::move(toExecute)){
+			pc = program.bytecode.begin();
 			dataStackScopes.push(0);
 		}
 
@@ -43,7 +41,7 @@ namespace stackmachine {
 				switch (pc->getOpCode()) {
 					// ==== META ====
 					case base::OpCode::LITERAL:
-						dataStack.push_back(pc->value()); break;
+						dataStack.push_back(program.getConstant(pc->value().getUint())); break;
 					case base::OpCode::STORE:
 					{
 						base::BasicType variableValue = pop();
@@ -109,10 +107,24 @@ namespace stackmachine {
 		std::string toString() const {
 			std::ostringstream stream;
 
-			stream << "Programm:" << std::endl;
-			for (int i = 0; i < programm.size(); i++) {
-				base::OpCode opCode = programm[i].getOpCode();
-				base::BasicType value = programm[i].value();
+			stream << "Literals:\n";
+			for (int i = 0; i < program.constants.size(); i++) {
+				stream << std::setw(3) << std::right << i << " | " << std::setw(20) << std::left;
+				stream << program.constants[i].toString() << " ";
+				stream << " (" << idToString(program.constants[i].typeId()) << ")\n";
+			}
+
+			stream << "\nStack:\n";
+			for (int i = 0; i < dataStack.size(); i++) {
+				stream << std::setw(3) << std::right << i << " | " << std::setw(20) << std::left;
+				stream << dataStack[i].toString() << " ";
+				stream << " (" << idToString(dataStack[i].typeId()) << ")\n";
+			}
+			
+			stream << "\nByteCode:\n";
+			for (int i = 0; i < program.bytecode.size(); i++) {
+				base::OpCode opCode = program.bytecode[i].getOpCode();
+				base::BasicType value = program.bytecode[i].value();
 
 				stream << std::setw(3) << std::right << i << " | " << std::setw(20) << std::left << opCodeName(opCode) << " ";
 				switch (opCode) {
@@ -143,7 +155,7 @@ namespace stackmachine {
 	private:
 		std::stack<size_t, std::vector<size_t>> dataStackScopes;
 		std::vector<base::BasicType> dataStack;
-		std::vector<base::Operation> programm;
+		base::Program program;
 		std::vector<base::Operation>::const_iterator pc;
 
 		base::BasicType pop() {

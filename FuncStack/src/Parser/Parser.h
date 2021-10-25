@@ -3,12 +3,13 @@
 #include "ShuntingYard.h"
 #include "Tokenizer.h"
 #include "PostParser.h"
+#include "src/Base/Program.h"
 #include "src/Base/Source.h"
 
 namespace compiler {
 	class Compiler {
 		const base::Source source;
-		std::list<base::Operation> program;
+		base::Program program;
 		const bool success = true;
 
 
@@ -32,7 +33,7 @@ namespace compiler {
 			postParser.run();
 		}
 
-		const std::list<base::Operation>& getProgram() const {
+		const base::Program& getProgram() const {
 			return program;
 		}
 

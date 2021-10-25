@@ -1,101 +1,93 @@
 #pragma once
 
-#include "src/Base/Operation.h"
+#include "src/Base/Program.h"
 
 namespace compiler {
 	class PostParser {
-		using list = std::list<base::Operation>;
-
-		struct JumpPoint {
-			list::iterator frame{};
-			size_t pos = 0;
-		};
+		using list = std::vector<base::Operation>;
 
 	public:
-		PostParser(list& _ops)
+		PostParser(base::Program& _ops)
 			: ops(_ops) {
 		}
 
 		void run() {
-			for (it = ops.begin(); it != ops.end(); it++) {
-				switch (it->getOpCode()) {
+			while (currentPos < ops.bytecode.size()) {
+				switch (ops.bytecode[currentPos].getOpCode()) {
 					case base::OpCode::LABEL:
 					{
-						const size_t labelId = it->value().getUint();
+						const size_t labelId = ops.bytecode[currentPos].value().getUint();
 
-						for (JumpPoint& jumpPoint : jumps[labelId]) {
-							const base::OpCode op = jumpPoint.frame->getOpCode();
-							const int jumpDistance = static_cast<int>(currentPos - jumpPoint.pos);
+						for (size_t prevJump : jumps[labelId]) {
+							base::Operation& prevjumpOp = ops.bytecode[prevJump];
 
+							const int jumpDistance = static_cast<int>(currentPos - prevJump);
 							if (std::abs(jumpDistance) > 1) {
-								const base::OpCode relativeJump = (op == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF_NOT;
-								*jumpPoint.frame = base::Operation(relativeJump, base::BasicType(jumpDistance));
-								optimizedJumps.push_back(jumpPoint);
+								const base::OpCode relativeJump = (prevjumpOp.getOpCode() == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF_NOT;
+								prevjumpOp = base::Operation(relativeJump, base::BasicType(jumpDistance));
+								optimizedJumps.push_back(prevJump);
 							} else {
-								deleteFrame(jumpPoint.frame, jumpPoint.pos);
+								deleteFrame(prevJump);
 							}
 						}
 
 						labels[labelId] = currentPos;
-						deleteFrame(it, currentPos);
-						break;
+						deleteFrame(currentPos);
 					}
+					break;
 					case base::OpCode::JUMP_LABEL: // fallthrough
 					case base::OpCode::JUMP_LABEL_IF_NOT:
 					{
-						const size_t labelId = it->value().getUint();
+						const size_t labelId = ops.bytecode[currentPos].value().getUint();
 
 						const auto jumpDestination = labels.find(labelId);
 						if (jumpDestination != labels.end()) {
-							const base::OpCode op = it->getOpCode();
-							const int jumpDistance = static_cast<int>(jumpDestination->second - currentPos);
+							base::Operation& jumpDestinationOp = ops.bytecode[currentPos];
 
+							const int jumpDistance = static_cast<int>(jumpDestination->second - currentPos);
 							if (std::abs(jumpDistance) > 1) {
-								const base::OpCode relativeJump = (op == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF_NOT;
-								*it = base::Operation(relativeJump, base::BasicType(jumpDistance));
-								optimizedJumps.push_back(JumpPoint{ it, currentPos });
+								const base::OpCode relativeJump = (jumpDestinationOp.getOpCode() == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF_NOT;
+								jumpDestinationOp = base::Operation(relativeJump, base::BasicType(jumpDistance));
+								optimizedJumps.push_back(currentPos);
 							} else {
-								deleteFrame(it, currentPos);
+								deleteFrame(currentPos);
 							}
 						} else {
-							jumps[labelId].push_back(JumpPoint{ it, currentPos });
+							jumps[labelId].push_back(currentPos);
 						}
-						break;
 					}
+					break;
 				}
 				currentPos++;
 			}
 		}
 
 	private:
-		list& ops;
+		base::Program& ops;
 
 		std::unordered_map<size_t, size_t> labels; /* index - position */
-		std::unordered_map<size_t, std::vector<JumpPoint>> jumps; /* index - jump-op */
+		std::unordered_map<size_t, std::vector<size_t>> jumps; /* index - position */
 
-		std::vector<JumpPoint> optimizedJumps;
+		std::vector<size_t> optimizedJumps;
 
 		size_t currentPos = 0;
-		list::iterator it;
 
-		void deleteFrame(list::iterator& it, size_t pos) {
-			const auto toDelete = it--;
-			ops.erase(toDelete);
+		void deleteFrame(size_t pos) {
+			ops.bytecode.erase(ops.bytecode.begin() + pos);
 			currentPos--;
 
-			for (JumpPoint& jump : optimizedJumps) {
+			for (size_t jump : optimizedJumps) {
 				if (jumpsOver(jump, pos)) {
-					base::sm_int& jumpDistance = jump.frame->value().getInt();
+					base::sm_int& jumpDistance = ops.bytecode[jump].value().getInt();
 					jumpDistance += (jumpDistance > 0) ? -1 : +1;
 					// TODO recursive
 				}
 			}
 		}
 
-		bool jumpsOver(const JumpPoint& jump, size_t pos) const {
-			const size_t from = jump.pos;
-			const size_t to = jump.pos + jump.frame->value().getInt();
-			auto [min, max] = std::minmax(from, to);
+		bool jumpsOver(size_t jump, size_t pos) const {
+			const size_t to = jump + ops.bytecode[jump].value().getInt();
+			auto [min, max] = std::minmax(jump, to);
 			return (min < pos) && (pos < max);
 		}
 	};

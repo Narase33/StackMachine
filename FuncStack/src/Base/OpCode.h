@@ -3,7 +3,7 @@
 #include "src/Exception.h"
 
 namespace base {
-	enum class OpCode {
+	enum class OpCode : uint8_t {
 		// Global
 		ERR, NOOP,
 
