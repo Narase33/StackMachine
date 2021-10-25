@@ -19,7 +19,7 @@
 
 template <typename T>
 void printSize(const char* name) {
-	std::cout << "Sizeof " << name << ":\t" << sizeof(T) << " Bytes\t" << (sizeof(T) / 8) << " ints" << std::endl;
+	std::cout << "Sizeof " << name << ": " << std::setw(2) << std::left << sizeof(T) << " Bytes (" << (sizeof(T) / 8) << " ints)" << std::endl;
 }
 
 int main(int argc, char* argv[]) {

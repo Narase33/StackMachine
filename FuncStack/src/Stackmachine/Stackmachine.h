@@ -41,31 +41,31 @@ namespace stackmachine {
 				switch (pc->getOpCode()) {
 					// ==== META ====
 					case base::OpCode::LITERAL:
-						dataStack.push_back(program.getConstant(pc->value().getUint())); break;
+						dataStack.push_back(program.getConstant(pc->unsignedData())); break;
 					case base::OpCode::STORE:
 					{
 						base::BasicType variableValue = pop();
-						setVariable(pc->value().getUint(), std::move(variableValue));
+						setVariable(pc->unsignedData(), std::move(variableValue));
 					}
 					break;
 					case base::OpCode::LOAD:
 					{
-						base::BasicType variableValue = getVariable(pc->value().getUint());
+						base::BasicType variableValue = getVariable(pc->unsignedData());
 						dataStack.push_back(std::move(variableValue));
 					}
 					break;
 					case base::OpCode::CREATE:
 					{
-						const base::sm_uint typeId = pc->value().getUint();
+						const base::sm_uint typeId = pc->unsignedData();
 						dataStack.push_back(base::BasicType::fromId(static_cast<base::TypeIndex>(typeId)));
 					}
 					break;
 					case base::OpCode::JUMP:
-						pc += pc->value().getInt() - 1; // loop will increment +1
+						pc += pc->signedData() - 1; // loop will increment +1
 						break;
 					case base::OpCode::JUMP_IF_NOT:
 						if (pop().getBool() == false) {
-							pc += pc->value().getInt() - 1; // loop will increment +1
+							pc += pc->signedData() - 1; // loop will increment +1
 						}
 						break;
 					case base::OpCode::BEGIN_SCOPE:
@@ -124,21 +124,21 @@ namespace stackmachine {
 			stream << "\nByteCode:\n";
 			for (int i = 0; i < program.bytecode.size(); i++) {
 				base::OpCode opCode = program.bytecode[i].getOpCode();
-				base::BasicType value = program.bytecode[i].value();
+				const int64_t value = program.bytecode[i].signedData();
 
 				stream << std::setw(3) << std::right << i << " | " << std::setw(20) << std::left << opCodeName(opCode) << " ";
 				switch (opCode) {
 					case base::OpCode::CREATE:
-						stream << value.toString() << " (" << idToString(static_cast<base::TypeIndex>(value.getUint())) << ")";
+						stream << value << " (" << idToString(static_cast<base::TypeIndex>(value)) << ")";
 						break;
 					case base::OpCode::JUMP: // fallthrough
 					case base::OpCode::JUMP_IF_NOT:
-						stream << value.toString() << " (" << (i + value.getInt()) << ")";
+						stream << value << " (" << (i + value) << ")";
 						break;
 					case base::OpCode::LITERAL: // fallthrough
 					case base::OpCode::STORE: // fallthrough
 					case base::OpCode::LOAD:
-						stream << value.toString();
+						stream << value;
 						break;
 				}
 

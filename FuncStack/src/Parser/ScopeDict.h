@@ -74,13 +74,13 @@ namespace compiler {
 		base::Operation createStoreOperation(Iterator it) const {
 			const std::optional<size_t> variableOffset = offsetVariable(std::get<std::string>(it->value));
 			assume(variableOffset.has_value(), "Variable not declared", it);
-			return base::Operation(base::OpCode::STORE, base::BasicType(variableOffset.value()));
+			return base::Operation(base::OpCode::STORE, variableOffset.value());
 		}
 
 		base::Operation createLoadOperation(Iterator it) const {
 			const std::optional<size_t> variableOffset = offsetVariable(std::get<std::string>(it->value));
 			assume(variableOffset.has_value(), "used variable not declared", it);
-			return base::Operation(base::OpCode::LOAD, base::BasicType(variableOffset.value()));
+			return base::Operation(base::OpCode::LOAD, variableOffset.value());
 		}
 
 	private:

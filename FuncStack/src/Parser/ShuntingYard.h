@@ -162,7 +162,7 @@ namespace compiler {
 						subProgram.push_back(base::Operation(opCode));
 						break;
 					case base::OpCode::LITERAL:
-						subProgram.push_back(base::Operation(base::OpCode::LITERAL, base::BasicType(program.addConstant(literalToValue(it)))));
+						subProgram.push_back(base::Operation(base::OpCode::LITERAL, program.addConstant(literalToValue(it))));
 						break;
 					case base::OpCode::NAME:
 					{
@@ -200,20 +200,20 @@ namespace compiler {
 			insertRoundBrackets(current, end);
 
 			const size_t jumpOverIndex = nextIndex();
-			program.bytecode.emplace_back(base::OpCode::JUMP_LABEL_IF_NOT, base::BasicType(jumpOverIndex)); // jump over if
+			program.bytecode.emplace_back(base::OpCode::JUMP_LABEL_IF_NOT, jumpOverIndex); // jump over if
 
 			assume(current->opCode == base::OpCode::BRACKET_CURLY_OPEN, "Missing 'if' body", *current);
 			insertCurlyBrackets(current, end);
 
-			program.bytecode.emplace_back(base::OpCode::JUMP_LABEL, base::BasicType(jumpToEndIndex)); // jump to end
-			program.bytecode.emplace_back(base::OpCode::LABEL, base::BasicType(jumpOverIndex)); // after if label
+			program.bytecode.emplace_back(base::OpCode::JUMP_LABEL, jumpToEndIndex); // jump to end
+			program.bytecode.emplace_back(base::OpCode::LABEL, jumpOverIndex); // after if label
 		}
 
 		void parse_if(Iterator& current, Iterator end) {
 			current++; // "if"
 			const size_t jumpToEndIndex = nextIndex();
 			insert_if_base(current, end, jumpToEndIndex);
-			program.bytecode.emplace_back(base::OpCode::LABEL, base::BasicType(jumpToEndIndex)); // set end label
+			program.bytecode.emplace_back(base::OpCode::LABEL, jumpToEndIndex); // set end label
 		}
 
 		void parse_else(Iterator& current, Iterator end) {
@@ -225,7 +225,7 @@ namespace compiler {
 			if (current->opCode == base::OpCode::IF) {
 				current++;
 
-				const size_t jumpToEndIndex = jumpToEndLabel.value().getUint();
+				const size_t jumpToEndIndex = jumpToEndLabel.unsignedData();
 				insert_if_base(current, end, jumpToEndIndex);
 			} else {
 				assume(current->opCode == base::OpCode::BRACKET_CURLY_OPEN, "'else' missing body", *current);
@@ -241,24 +241,24 @@ namespace compiler {
 			const size_t headLabel = nextIndex();
 			const size_t endLabel = nextIndex();
 
-			program.bytecode.push_back(base::Operation(base::OpCode::LABEL, base::BasicType(headLabel)));
+			program.bytecode.push_back(base::Operation(base::OpCode::LABEL, headLabel));
 
 			assume(current->opCode == base::OpCode::BRACKET_ROUND_OPEN, "Missing round brackets after 'while'", *current);
 			insertRoundBrackets(current, end);
 
-			program.bytecode.push_back(base::Operation(base::OpCode::JUMP_LABEL_IF_NOT, base::BasicType(endLabel)));
+			program.bytecode.push_back(base::Operation(base::OpCode::JUMP_LABEL_IF_NOT, endLabel));
 
 			assume(current->opCode == base::OpCode::BRACKET_CURLY_OPEN, "'while' missing body", *current);
 			scope.pushLoop(headLabel, endLabel);
 			insertCurlyBrackets(current, end);
 			scope.popLoop();
 
-			program.bytecode.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::BasicType(headLabel)));
+			program.bytecode.push_back(base::Operation(base::OpCode::JUMP_LABEL, headLabel));
 
-			program.bytecode.push_back(base::Operation(base::OpCode::LABEL, base::BasicType(endLabel)));
+			program.bytecode.push_back(base::Operation(base::OpCode::LABEL, endLabel));
 		}
 
-		void jumpOutOfLoop(Iterator& current, std::function<size_t(const ScopeDict::LoopLayer&)> which) {
+		void jumpOutOfLoop(Iterator& current, size_t (*headOrEndLabel)(const ScopeDict::LoopLayer&)) {
 			size_t levelsToJump = 0;
 			const Iterator next = current + 1;
 			if (next->opCode == base::OpCode::LITERAL) {
@@ -276,7 +276,7 @@ namespace compiler {
 				program.bytecode.push_back(base::Operation(base::OpCode::END_SCOPE));
 			}
 
-			program.bytecode.push_back(base::Operation(base::OpCode::JUMP_LABEL, base::BasicType(which(loopLabels.value()))));
+			program.bytecode.push_back(base::Operation(base::OpCode::JUMP_LABEL, headOrEndLabel(loopLabels.value())));
 			assume(current->opCode == base::OpCode::END_STATEMENT, "Missing end statement", *current);
 			current++;
 		}
@@ -309,8 +309,8 @@ namespace compiler {
 					switch (current->opCode) {
 						case base::OpCode::TYPE:
 						{
-							assert(!std::holds_alternative<std::monostate>(current->value));
-							base::BasicType variableType = literalToValue(current);
+							assert(std::holds_alternative<std::size_t>(current->value));
+							size_t variableType = std::get<size_t>(current->value);
 							current++;
 
 							assume(std::holds_alternative<std::string>(current->value), "Missing variable name after type declaration", *current);
@@ -318,7 +318,7 @@ namespace compiler {
 							const bool unknownVariable = scope.pushVariable(variableName);
 							assume(unknownVariable, "Variable already defined", *current);
 
-							program.bytecode.push_back(base::Operation(base::OpCode::CREATE, std::move(variableType)));
+							program.bytecode.push_back(base::Operation(base::OpCode::CREATE, variableType));
 						}
 						break;
 						case base::OpCode::NAME:
