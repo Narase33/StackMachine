@@ -12,7 +12,7 @@ namespace stackmachine {
 	class StackMachine {
 	public:
 		StackMachine(base::Program toExecute)
-			: program(std::move(toExecute)){
+			: program(std::move(toExecute)) {
 			pc = program.bytecode.begin();
 			dataStackScopes.push(0);
 		}
@@ -41,25 +41,17 @@ namespace stackmachine {
 				switch (pc->getOpCode()) {
 					// ==== META ====
 					case base::OpCode::LITERAL:
-						dataStack.push_back(program.getConstant(pc->unsignedData())); break;
+						dataStack.push_back(program.getConstant(pc->unsignedData()));
+						break;
 					case base::OpCode::STORE:
-					{
-						base::BasicType variableValue = pop();
-						setVariable(pc->unsignedData(), std::move(variableValue));
-					}
-					break;
+						setVariable(pc->unsignedData(), dataStack.back());
+						break;
 					case base::OpCode::LOAD:
-					{
-						base::BasicType variableValue = getVariable(pc->unsignedData());
-						dataStack.push_back(std::move(variableValue));
-					}
-					break;
+						dataStack.push_back(getVariable(pc->unsignedData()));
+						break;
 					case base::OpCode::CREATE:
-					{
-						const base::sm_uint typeId = pc->unsignedData();
-						dataStack.push_back(base::BasicType::fromId(static_cast<base::TypeIndex>(typeId)));
-					}
-					break;
+						dataStack.push_back(base::BasicType::fromId(static_cast<base::TypeIndex>(pc->unsignedData())));
+						break;
 					case base::OpCode::JUMP:
 						pc += pc->signedData() - 1; // loop will increment +1
 						break;
@@ -77,26 +69,36 @@ namespace stackmachine {
 						break;
 						// ==== COMPARE ====
 					case base::OpCode::EQ:
-						executeOP(std::equal_to()); break;
+						executeOP(std::equal_to());
+						break;
 					case base::OpCode::UNEQ:
-						executeOP(std::not_equal_to()); break;
+						executeOP(std::not_equal_to());
+						break;
 					case base::OpCode::LESS:
-						executeOP(std::less()); break;
+						executeOP(std::less());
+						break;
 					case base::OpCode::BIGGER:
-						executeOP(std::greater()); break;
+						executeOP(std::greater());
+						break;
 						// ==== MATH ====
 					case base::OpCode::INCR:
-						executeOP(std::plus(), base::BasicType(1)); break;
+						executeOP(std::plus(), base::BasicType(1));
+						break;
 					case base::OpCode::DECR:
-						executeOP(std::minus(), base::BasicType(1)); break;
+						executeOP(std::minus(), base::BasicType(1));
+						break;
 					case base::OpCode::ADD:
-						executeOP(std::plus()); break;
+						executeOP(std::plus());
+						break;
 					case base::OpCode::SUB:
-						executeOP(std::minus()); break;
+						executeOP(std::minus());
+						break;
 					case base::OpCode::MULT:
-						executeOP(std::multiplies()); break;
+						executeOP(std::multiplies());
+						break;
 					case base::OpCode::DIV:
-						executeOP(std::divides()); break;
+						executeOP(std::divides());
+						break;
 					default:
 						throw ex::Exception("Unrecognized token: "s + opCodeName(pc->getOpCode()));
 				}
@@ -120,7 +122,7 @@ namespace stackmachine {
 				stream << dataStack[i].toString() << " ";
 				stream << " (" << idToString(dataStack[i].typeId()) << ")\n";
 			}
-			
+
 			stream << "\nByteCode:\n";
 			for (int i = 0; i < program.bytecode.size(); i++) {
 				base::OpCode opCode = program.bytecode[i].getOpCode();
@@ -164,13 +166,15 @@ namespace stackmachine {
 			return data;
 		}
 
-		void executeOP(std::function<base::BasicType(const base::BasicType& a, const base::BasicType& b)> func) {
+		template<typename ExecutionFunction>
+		void executeOP(ExecutionFunction func) {
 			const base::BasicType a = pop();
 			const base::BasicType b = pop();
 			dataStack.push_back(func(b, a));
 		}
 
-		void executeOP(std::function<base::BasicType(const base::BasicType& a, const base::BasicType& b)> func, const base::BasicType& operand) {
+		template<typename ExecutionFunction>
+		void executeOP(ExecutionFunction func, const base::BasicType& operand) {
 			const base::BasicType a = pop();
 			dataStack.push_back(func(a, operand));
 		}

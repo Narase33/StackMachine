@@ -21,9 +21,9 @@ namespace controlFlowTest {
 
 				machine.exec();
 				std::vector<BasicType> dataStack = machine.getDataStack();
-				REQUIRE(dataStack.size() == 1);
+				REQUIRE(dataStack.size() == 2);
 
-				REQUIRE(dataStack.back().getInt() == expected.getInt());
+				REQUIRE(machine.getVariable(0).getInt() == expected.getInt());
 				dataStack.pop_back();
 			} catch (const std::exception& e) {
 				FAIL(e.what());
@@ -41,7 +41,7 @@ namespace controlFlowTest {
 				INFO(machine.toString());
 
 				machine.exec();
-				REQUIRE(machine.getDataStack().size() == expected.size());
+				REQUIRE(machine.getDataStack().size() == expected.size()*2);
 
 				for (int i = 0; i < expected.size(); i++) {
 					REQUIRE((machine.getVariable(i) == expected[i]).getBool());

@@ -214,6 +214,10 @@ namespace compiler {
 			const size_t jumpToEndIndex = nextIndex();
 			insert_if_base(current, end, jumpToEndIndex);
 			program.bytecode.emplace_back(base::OpCode::LABEL, jumpToEndIndex); // set end label
+
+			while ((current != end) and (current->opCode == base::OpCode::ELSE)) {
+				parse_else(current, end);
+			}
 		}
 
 		void parse_else(Iterator& current, Iterator end) {
@@ -334,9 +338,6 @@ namespace compiler {
 							break;
 						case base::OpCode::IF:
 							parse_if(current, end);
-							break;
-						case base::OpCode::ELSE:
-							parse_else(current, end);
 							break;
 						case base::OpCode::WHILE:
 							parse_while(current, end);
