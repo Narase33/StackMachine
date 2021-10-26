@@ -99,7 +99,7 @@ namespace compiler {
 				const std::string lexem = extractLexem(partOfVariableName);
 
 				if ((lexem == "true") or (lexem == "false")) {
-					return Token(base::OpCode::LITERAL, lexem == "true", pos()); // Literal Bool
+					return Token(base::OpCode::LOAD_LITERAL, lexem == "true", pos()); // Literal Bool
 				}
 
 				const base::OpCode symbol = base::opCodeFromKeyword(lexem);
@@ -136,7 +136,7 @@ namespace compiler {
 					if (isDigit()) {
 						const std::string afterDot = extractNumber();
 						if (!std::isalpha(*current)) {
-							return Token(base::OpCode::LITERAL, std::stod(beforeDot + "." + afterDot), pos()); // Literal Double
+							return Token(base::OpCode::LOAD_LITERAL, std::stod(beforeDot + "." + afterDot), pos()); // Literal Double
 						}
 					}
 					current = save;
@@ -144,9 +144,9 @@ namespace compiler {
 
 				if (!isEnd() and (*current == 'u')) {
 					current++;
-					return Token(base::OpCode::LITERAL, static_cast<base::sm_uint>(std::stoul(beforeDot)), pos()); // Literal Long
+					return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_uint>(std::stoul(beforeDot)), pos()); // Literal Long
 				}
-				return Token(base::OpCode::LITERAL, static_cast<base::sm_int>(std::stol(beforeDot)), pos()); // Literal Long
+				return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_int>(std::stol(beforeDot)), pos()); // Literal Long
 			}
 
 			current = save;

@@ -40,32 +40,37 @@ namespace stackmachine {
 			while (pc->getOpCode() != base::OpCode::END_PROGRAM) {
 				switch (pc->getOpCode()) {
 					// ==== META ====
-					case base::OpCode::LITERAL:
+					case base::OpCode::POP:
+						dataStack.pop_back();
+						break;
+					case base::OpCode::LOAD_LITERAL:
 						dataStack.push_back(program.getConstant(pc->unsignedData()));
 						break;
 					case base::OpCode::STORE:
 						setVariable(pc->unsignedData(), dataStack.back());
 						break;
-					case base::OpCode::LOAD:
+					case base::OpCode::LOAD_VARIABLE:
 						dataStack.push_back(getVariable(pc->unsignedData()));
 						break;
-					case base::OpCode::CREATE:
+					case base::OpCode::CREATE_VARIABLE:
 						dataStack.push_back(base::BasicType::fromId(static_cast<base::TypeIndex>(pc->unsignedData())));
 						break;
 					case base::OpCode::JUMP:
-						pc += pc->signedData() - 1; // loop will increment +1
+						pc += pc->signedData(); // loop will increment +1
 						break;
 					case base::OpCode::JUMP_IF_NOT:
 						if (pop().getBool() == false) {
-							pc += pc->signedData() - 1; // loop will increment +1
+							pc += pc->signedData(); // loop will increment +1
 						}
 						break;
 					case base::OpCode::BEGIN_SCOPE:
 						dataStackScopes.push(dataStack.size());
 						break;
 					case base::OpCode::END_SCOPE:
-						dataStack.erase(dataStack.begin() + dataStackScopes.top(), dataStack.end());
-						dataStackScopes.pop();
+						for (int i = 0; i < pc->signedData(); i++) {
+							dataStack.erase(dataStack.begin() + dataStackScopes.top(), dataStack.end());
+							dataStackScopes.pop();
+						}
 						break;
 						// ==== COMPARE ====
 					case base::OpCode::EQ:
@@ -104,6 +109,7 @@ namespace stackmachine {
 				}
 				pc++;
 			}
+			assert(dataStackScopes.size() == 1);
 		}
 
 		std::string toString() const {
@@ -130,16 +136,19 @@ namespace stackmachine {
 
 				stream << std::setw(3) << std::right << i << " | " << std::setw(20) << std::left << opCodeName(opCode) << " ";
 				switch (opCode) {
-					case base::OpCode::CREATE:
+					case base::OpCode::CREATE_VARIABLE:
 						stream << value << " (" << idToString(static_cast<base::TypeIndex>(value)) << ")";
 						break;
 					case base::OpCode::JUMP: // fallthrough
 					case base::OpCode::JUMP_IF_NOT:
-						stream << value << " (" << (i + value) << ")";
+						stream << value << " -> " << (i + value);
 						break;
-					case base::OpCode::LITERAL: // fallthrough
+					case base::OpCode::LOAD_LITERAL:
+						stream << value << " (" << program.constants[value].toString() << ")";
+						break;
+					case base::OpCode::END_SCOPE: // fallthrough
 					case base::OpCode::STORE: // fallthrough
-					case base::OpCode::LOAD:
+					case base::OpCode::LOAD_VARIABLE:
 						stream << value;
 						break;
 				}

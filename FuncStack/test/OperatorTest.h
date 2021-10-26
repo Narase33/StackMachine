@@ -19,7 +19,7 @@ namespace operatorTest {
 				INFO(machine.toString());
 				machine.exec();
 
-				REQUIRE(machine.getDataStack().size() == 2);
+				//REQUIRE(machine.getDataStack().size() == 1);
 				REQUIRE((machine.getVariable(0) == expected).getBool());
 			} catch (const std::exception& e) {
 				FAIL(e.what());

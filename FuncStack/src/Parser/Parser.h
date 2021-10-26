@@ -29,8 +29,8 @@ namespace compiler {
 			program = shunting.run();
 			assume(shunting.isSuccess(), "Errors during shunting yard");
 
-			PostParser postParser(program);
-			postParser.run();
+			//PostParser postParser(program);
+			//postParser.run();
 		}
 
 		const base::Program& getProgram() const {

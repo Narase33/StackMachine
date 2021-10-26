@@ -13,52 +13,7 @@ namespace compiler {
 
 		void run() {
 			while (currentPos < ops.bytecode.size()) {
-				switch (ops.bytecode[currentPos].getOpCode()) {
-					case base::OpCode::LABEL:
-					{
-						const size_t labelId = ops.bytecode[currentPos].unsignedData();
-
-						for (size_t prevJump : jumps[labelId]) {
-							base::Operation& prevjumpOp = ops.bytecode[prevJump];
-
-							const int64_t jumpDistance = static_cast<int64_t>(currentPos - prevJump);
-							if (std::abs(jumpDistance) > 1) {
-								const base::OpCode relativeJump = (prevjumpOp.getOpCode() == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF_NOT;
-								prevjumpOp = base::Operation(relativeJump, jumpDistance);
-								optimizedJumps.push_back(prevJump);
-							} else {
-								deleteFrame(prevJump);
-							}
-						}
-
-						labels[labelId] = currentPos;
-						deleteFrame(currentPos);
-					}
-					break;
-					case base::OpCode::JUMP_LABEL: // fallthrough
-					case base::OpCode::JUMP_LABEL_IF_NOT:
-					{
-						const size_t labelId = ops.bytecode[currentPos].unsignedData();
-
-						const auto jumpDestination = labels.find(labelId);
-						if (jumpDestination != labels.end()) {
-							base::Operation& jumpDestinationOp = ops.bytecode[currentPos];
-
-							const int64_t jumpDistance = static_cast<int64_t>(jumpDestination->second - currentPos);
-							if (std::abs(jumpDistance) > 1) {
-								const base::OpCode relativeJump = (jumpDestinationOp.getOpCode() == base::OpCode::JUMP_LABEL) ? base::OpCode::JUMP : base::OpCode::JUMP_IF_NOT;
-								jumpDestinationOp = base::Operation(relativeJump, jumpDistance);
-								optimizedJumps.push_back(currentPos);
-							} else {
-								deleteFrame(currentPos);
-							}
-						} else {
-							jumps[labelId].push_back(currentPos);
-						}
-					}
-					break;
-				}
-				currentPos++;
+				
 			}
 		}
 

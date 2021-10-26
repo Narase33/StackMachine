@@ -7,9 +7,6 @@ namespace base {
 		// Global
 		ERR, NOOP,
 
-		// Parser only
-		JUMP_LABEL, JUMP_LABEL_IF_NOT, LABEL,
-
 		// Lexer
 		END_STATEMENT,
 		IF, ELSE, WHILE,
@@ -21,7 +18,7 @@ namespace base {
 		NAME,
 
 		// Lexer + Interpreter
-		LITERAL,
+		LOAD_LITERAL,
 		EQ, UNEQ,
 		BIGGER, LESS,
 		ADD, SUB,
@@ -32,9 +29,9 @@ namespace base {
 		// Interpreter
 		BEGIN_SCOPE, END_SCOPE,
 		END_PROGRAM,
-		LOAD, STORE,
+		LOAD_VARIABLE, STORE,
 		JUMP, JUMP_IF_NOT,
-		CREATE, POP,
+		CREATE_VARIABLE, POP,
 	};
 
 	OpCode opCodeFromKeyword(const std::string_view keyword) {
@@ -75,7 +72,7 @@ namespace base {
 
 	int opCodePriority(OpCode opCode) {
 		switch (opCode) {
-			case OpCode::LITERAL: return 1;
+			case OpCode::LOAD_LITERAL: return 1;
 			case OpCode::NAME: return 0;
 			case OpCode::BRACKET_ROUND_OPEN: return 0;
 			case OpCode::BRACKET_CURLY_OPEN: return 0;
@@ -96,16 +93,16 @@ namespace base {
 
 	int opCodeImpact(OpCode opCode) {
 		switch (opCode) {
-			case base::OpCode::LOAD:
+			case base::OpCode::LOAD_VARIABLE:
 			case base::OpCode::NAME:
-			case base::OpCode::LITERAL: return 1;
+			case base::OpCode::LOAD_LITERAL: return 1;
 			case base::OpCode::JUMP:
 			case base::OpCode::JUMP_IF_NOT:
 			case base::OpCode::BEGIN_SCOPE:
 			case base::OpCode::END_SCOPE:
 			case base::OpCode::INCR:
 			case base::OpCode::DECR:
-			case base::OpCode::CREATE: return 0;
+			case base::OpCode::CREATE_VARIABLE: return 0;
 			case base::OpCode::EQ:
 			case base::OpCode::UNEQ:
 			case base::OpCode::LESS:
@@ -162,11 +159,6 @@ namespace base {
 			SM_REGISTER_NAME(OpCode::NOOP);
 			SM_REGISTER_NAME(OpCode::ERR);
 
-			// Parser only
-			SM_REGISTER_NAME(OpCode::JUMP_LABEL);
-			SM_REGISTER_NAME(OpCode::JUMP_LABEL_IF_NOT);
-			SM_REGISTER_NAME(OpCode::LABEL);
-
 			// Lexer
 			SM_REGISTER_NAME(OpCode::TYPE);
 			SM_REGISTER_NAME(OpCode::END_STATEMENT);
@@ -184,7 +176,7 @@ namespace base {
 			SM_REGISTER_NAME(OpCode::NAME);
 
 			// Lexer + Interpreter
-			SM_REGISTER_NAME(OpCode::LITERAL);
+			SM_REGISTER_NAME(OpCode::LOAD_LITERAL);
 			SM_REGISTER_NAME(OpCode::BEGIN_SCOPE);
 			SM_REGISTER_NAME(OpCode::END_SCOPE);
 			SM_REGISTER_NAME(OpCode::EQ);
@@ -201,11 +193,11 @@ namespace base {
 
 			// Interpreter
 			SM_REGISTER_NAME(OpCode::END_PROGRAM);
-			SM_REGISTER_NAME(OpCode::LOAD);
+			SM_REGISTER_NAME(OpCode::LOAD_VARIABLE);
 			SM_REGISTER_NAME(OpCode::STORE);
 			SM_REGISTER_NAME(OpCode::JUMP);
 			SM_REGISTER_NAME(OpCode::JUMP_IF_NOT);
-			SM_REGISTER_NAME(OpCode::CREATE);
+			SM_REGISTER_NAME(OpCode::CREATE_VARIABLE);
 			SM_REGISTER_NAME(OpCode::POP);
 		}
 		return "";

@@ -7,8 +7,9 @@ namespace compiler {
 		using Iterator = std::vector<Token>::const_iterator;
 
 	public:
-		struct LoopLayer {
-			size_t level, head, end;
+		struct Breaker {
+			size_t index, breakCount, level;
+			Iterator it;
 		};
 
 		struct Variable {
@@ -30,12 +31,30 @@ namespace compiler {
 			scopeLevel--;
 		}
 
-		void pushLoop(size_t headLabel, size_t endLabel) {
-			loops.push_back({ scopeLevel, headLabel, endLabel });
+		void pushBreaker(size_t index, size_t breakCount, Iterator it) {
+			breakers.push_back({ index, breakCount, scopeLevel, it });
 		}
 
-		void popLoop() {
-			loops.pop_back();
+		void pushLoop() {
+			for (Breaker& b : breakers) {
+				b.breakCount++;
+			}
+		}
+
+		std::vector<Breaker> popLoop() {
+			for (Breaker& b : breakers) {
+				b.breakCount--;
+			}
+
+			const auto pos = std::remove_if(breakers.begin(), breakers.end(), [](const Breaker& b) {
+				return b.breakCount == 0;
+			});
+
+			std::vector<Breaker> toResolve;
+			std::copy(pos, breakers.end(), std::back_inserter(toResolve));
+			breakers.erase(pos, breakers.end());
+
+			return toResolve;
 		}
 
 		bool pushVariable(const std::string& variableName) {
@@ -59,14 +78,6 @@ namespace compiler {
 			return _getVariableIt(variableName) != variables.end();
 		}
 
-		std::optional<LoopLayer> loopLabelFromOffset(size_t offset) const {
-			if (loops.size() < offset) {
-				return {};
-			}
-
-			return loops[loops.size() - 1 - offset];
-		}
-
 		size_t level() const {
 			return scopeLevel;
 		}
@@ -80,11 +91,11 @@ namespace compiler {
 		base::Operation createLoadOperation(Iterator it) const {
 			const std::optional<size_t> variableOffset = offsetVariable(std::get<std::string>(it->value));
 			assume(variableOffset.has_value(), "used variable not declared", it);
-			return base::Operation(base::OpCode::LOAD, variableOffset.value());
+			return base::Operation(base::OpCode::LOAD_VARIABLE, variableOffset.value());
 		}
 
 	private:
-		std::vector<LoopLayer> loops;
+		std::vector<Breaker> breakers;
 		std::vector<Variable> variables;
 		size_t scopeLevel = 0;
 
