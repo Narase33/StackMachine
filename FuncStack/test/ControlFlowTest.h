@@ -20,6 +20,7 @@ namespace controlFlowTest {
 				INFO(machine.toString());
 
 				machine.exec();
+				INFO(machine.toString());
 				std::vector<BasicType> dataStack = machine.getDataStack();
 				//REQUIRE(dataStack.size() == 1);
 
@@ -41,6 +42,7 @@ namespace controlFlowTest {
 				INFO(machine.toString());
 
 				machine.exec();
+				INFO(machine.toString());
 				//REQUIRE(machine.getDataStack().size() == expected.size());
 
 				for (int i = 0; i < expected.size(); i++) {

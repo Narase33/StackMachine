@@ -22,7 +22,7 @@ namespace variableTest {
 				INFO(machine.toString());
 
 				machine.exec();
-
+				INFO(machine.toString());
 				REQUIRE(machine.getVariable(0).getInt() == 3);
 			}
 
@@ -34,6 +34,7 @@ namespace variableTest {
 				INFO(machine.toString());
 
 				machine.exec();
+				INFO(machine.toString());
 				REQUIRE(machine.getVariable(0).getUint() == 3);
 			}
 
@@ -45,6 +46,7 @@ namespace variableTest {
 				INFO(machine.toString());
 
 				machine.exec();
+				INFO(machine.toString());
 				REQUIRE(machine.getVariable(0).getFloat() == 3.3);
 			}
 
@@ -56,6 +58,7 @@ namespace variableTest {
 				INFO(machine.toString());
 
 				machine.exec();
+				INFO(machine.toString());
 				REQUIRE(machine.getVariable(0).getBool() == true);
 			}
 
@@ -73,6 +76,8 @@ namespace variableTest {
 				INFO(machine.toString());
 
 				machine.exec();
+				INFO(machine.toString());
+
 				REQUIRE(machine.getVariable(0).getInt() == 1);
 				REQUIRE(machine.getVariable(1).getUint() == 2);
 				REQUIRE(machine.getVariable(2).getFloat() == 3.3);
@@ -90,7 +95,10 @@ namespace variableTest {
 			REQUIRE(compiler.isSuccessful());
 
 			StackMachine machine(compiler.getProgram());
-			INFO(machine.toString());			machine.exec();
+			INFO(machine.toString());
+
+			machine.exec();
+			INFO(machine.toString());
 
 			REQUIRE(machine.getVariable(0).getInt() == 2);
 			REQUIRE(machine.getVariable(1).getInt() == 3);

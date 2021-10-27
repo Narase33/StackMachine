@@ -32,17 +32,26 @@ namespace compiler {
 			return bytecode.size() - 1;
 		}
 
+		void consume(base::OpCode expected, const std::string& message) {
+			assume((_current != _end) and (_current->opCode == expected), message, *_current);
+			_current++;
+		}
+
+		void consume(base::OpCode expected) {
+			consume(expected, "Expected " + opCodeName(expected) + ", got " + opCodeName(_current->opCode));
+		}
+
 		void assume(bool condition, const std::string& message, const Token& t) const {
 			if (!condition) {
 				throw ex::ParserException(message, t.pos);
 			}
 		}
 
-		void runToNextSync(Iterator& current, Iterator end) {
-			while ((current != end) and (!utils::any_of(current->opCode, { base::OpCode::BRACKET_ROUND_CLOSE, base::OpCode::BRACKET_CURLY_CLOSE }))) {
-				current++;
+		void runToNextSync(Iterator& _current, Iterator _end) {
+			while ((_current != _end) and (!utils::any_of(_current->opCode, { base::OpCode::BRACKET_ROUND_CLOSE, base::OpCode::BRACKET_CURLY_CLOSE }))) {
+				_current++;
 			}
-			current++;
+			_current++;
 		}
 
 		int getCheckedPriority(const Token& token) const {
@@ -51,32 +60,32 @@ namespace compiler {
 			return priority;
 		}
 
-		base::BasicType literalToValue(Iterator current) const {
-			if (std::holds_alternative<base::sm_int>(current->value)) {
-				return base::BasicType(std::get<base::sm_int>(current->value));
-			} else if (std::holds_alternative<base::sm_uint>(current->value)) {
-				return base::BasicType(std::get<base::sm_uint>(current->value));
-			} else if (std::holds_alternative<base::sm_float>(current->value)) {
-				return base::BasicType(std::get<base::sm_float>(current->value));
-			} else if (std::holds_alternative<base::sm_bool>(current->value)) {
-				return base::BasicType(std::get<base::sm_bool>(current->value));
+		base::BasicType literalToValue(Iterator _current) const {
+			if (std::holds_alternative<base::sm_int>(_current->value)) {
+				return base::BasicType(std::get<base::sm_int>(_current->value));
+			} else if (std::holds_alternative<base::sm_uint>(_current->value)) {
+				return base::BasicType(std::get<base::sm_uint>(_current->value));
+			} else if (std::holds_alternative<base::sm_float>(_current->value)) {
+				return base::BasicType(std::get<base::sm_float>(_current->value));
+			} else if (std::holds_alternative<base::sm_bool>(_current->value)) {
+				return base::BasicType(std::get<base::sm_bool>(_current->value));
 			}
-			ex::ParserException("Unknown value", current->pos);
+			ex::ParserException("Unknown value", _current->pos);
 		}
 
-		Iterator unwindGroup(Iterator& current, Iterator end) {
-			const Iterator groupStart = current + 1;
+		Iterator unwindGroup() {
+			const Iterator groupStart = _current + 1;
 
-			auto [bracketBegin, bracketEnd] = base::getBracketGroup(current->opCode);
-			assume(bracketBegin != base::OpCode::ERR, "Expected group", *current);
+			auto [bracketBegin, bracketEnd] = base::getBracketGroup(_current->opCode);
+			assume(bracketBegin != base::OpCode::ERR, "Expected group", *_current);
 
 			int counter = 1;
 			do {
-				current++;
-				assume(current != end, "Group didnt close", *groupStart);
+				_current++;
+				assume(_current != _end, "Group didnt close", *groupStart);
 
-				if (current->opCode == bracketBegin) counter++;
-				if (current->opCode == bracketEnd) counter--;
+				if (_current->opCode == bracketBegin) counter++;
+				if (_current->opCode == bracketEnd) counter--;
 			} while (counter > 0);
 			return groupStart;
 		}
@@ -181,69 +190,69 @@ namespace compiler {
 			return subProgram;
 		}
 
-		void insertCurlyBrackets(Iterator& current, Iterator end) {
-			program.bytecode.push_back(base::Operation(base::OpCode::BEGIN_SCOPE));
+		void insertCurlyBrackets() {
+			bytecode.push_back(base::Operation(base::OpCode::BEGIN_SCOPE));
 			scope.pushScope();
-			current++;
+			consume(base::OpCode::BRACKET_CURLY_OPEN);
 
-			while ((current != end) and (current->opCode != base::OpCode::BRACKET_CURLY_CLOSE)) {
-				compileStatement(current, end);
+			while ((_current != _end) and (_current->opCode != base::OpCode::BRACKET_CURLY_CLOSE)) {
+				compileStatement();
 			}
 
 			scope.popScope();
-			program.bytecode.push_back(base::Operation(base::OpCode::END_SCOPE, 1));
+			bytecode.push_back(base::Operation(base::OpCode::END_SCOPE, 1));
 
-			current++;
+			consume(base::OpCode::BRACKET_CURLY_CLOSE);
 		}
 
-		void insertRoundBrackets(Iterator& current, Iterator end) {
-			const Iterator beginCondition = unwindGroup(current, end);
-			program.spliceBytecode(shuntingYard(beginCondition, current));
-			current++;
+		void insertRoundBrackets() {
+			const Iterator beginCondition = unwindGroup();
+			program.spliceBytecode(shuntingYard(beginCondition, _current));
+			consume(base::OpCode::BRACKET_ROUND_CLOSE);
 		}
 
 		template<base::OpCode jump>
-		size_t insert_if_base(Iterator& current, Iterator end) {
+		size_t insert_if_base() {
 			static_assert((jump == base::OpCode::JUMP) or (jump == base::OpCode::JUMP_IF_NOT));
 
 			bytecode.push_back(base::Operation(jump, 0)); // jump over block
 			const size_t jumpIndex = index();
-			compileStatement(current, end);
+			compileStatement();
 			bytecode[jumpIndex].signedData() = index() - jumpIndex;
 			return jumpIndex;
 		}
 
-		void parse_if(Iterator& current, Iterator end) {
-			current++; // "if"
+		void parse_if() {
+			consume(base::OpCode::IF);
 
-			assume(current->opCode == base::OpCode::BRACKET_ROUND_OPEN, "Missing round brackets after 'if'", *current);
-			insertRoundBrackets(current, end);
+			assume(_current->opCode == base::OpCode::BRACKET_ROUND_OPEN, "Missing round brackets after 'if'", *_current);
+			insertRoundBrackets();
 
-			const size_t jumpIndex = insert_if_base<base::OpCode::JUMP_IF_NOT>(current, end);
+			const size_t jumpIndex = insert_if_base<base::OpCode::JUMP_IF_NOT>();
 
-			if ((current != end) and (current->opCode == base::OpCode::ELSE)) {
-				current++; // "else"
+			if ((_current != _end) and (_current->opCode == base::OpCode::ELSE)) {
+				consume(base::OpCode::ELSE);
 				bytecode[jumpIndex].signedData()++;
-				insert_if_base<base::OpCode::JUMP>(current, end);
+				insert_if_base<base::OpCode::JUMP>();
 			}
 		}
 
 
-		void parse_while(Iterator& current, Iterator end) {
-			current++; // "while"
+		void parse_while() {
+			consume(base::OpCode::WHILE);
 
 			const size_t headIndex = index();
-			assume(current->opCode == base::OpCode::BRACKET_ROUND_OPEN, "Missing round brackets after 'while'", *current);
-			insertRoundBrackets(current, end);
+			assume(_current->opCode == base::OpCode::BRACKET_ROUND_OPEN, "Missing round brackets after 'while'", *_current);
+			insertRoundBrackets();
 
-			program.bytecode.push_back(base::Operation(base::OpCode::JUMP_IF_NOT, 0));
+			bytecode.push_back(base::Operation(base::OpCode::JUMP_IF_NOT, 0));
 			const size_t jumpIndex = index();
 
 			scope.pushLoop();
-			compileStatement(current, end); // TODO Single statement need scope
+			compileStatement(); // TODO Single statement need scope
 			const std::vector<ScopeDict::Breaker> breakers = scope.popLoop();
 
-			program.bytecode.push_back(base::Operation(base::OpCode::JUMP, static_cast<int32_t>(headIndex - index() - 1 /* "pc++" */)));
+			bytecode.push_back(base::Operation(base::OpCode::JUMP, static_cast<int32_t>(headIndex - index() - 1 /* "pc++" */)));
 			const size_t indexAfterLoop = index();
 			bytecode[jumpIndex].signedData() = indexAfterLoop - jumpIndex;
 
@@ -267,100 +276,87 @@ namespace compiler {
 			}
 		}
 
-		template<base::OpCode breaker>
-		void registerBreaker(Iterator& current) {
-			static_assert((breaker == base::OpCode::CONTINUE) or (breaker == base::OpCode::BREAK));
-
-			const Iterator breakerIt = current;
+		void registerBreaker() {
+			const Iterator breakerIt = _current;
 			size_t levelsToJump = 1;
-			current++; // breaker
-			if (current->opCode != base::OpCode::END_STATEMENT) {
-				assume(current->opCode == base::OpCode::LOAD_LITERAL, "expected number after keyword", *current);
-				assume(std::holds_alternative<base::sm_int>(current->value), "expected number after keyword", *current);
-				levelsToJump = std::get<base::sm_int>(current->value);
-				assume(levelsToJump > 0, "jump levels must be > 0", *current);
-				current++; // literal
+			_current++; // "continue" or "break"
+
+			if (_current->opCode != base::OpCode::END_STATEMENT) {
+				assume(_current->opCode == base::OpCode::LOAD_LITERAL, "expected literal after keyword", *_current);
+				assume(std::holds_alternative<base::sm_int>(_current->value), "expected literal after keyword", *_current);
+				levelsToJump = std::get<base::sm_int>(_current->value);
+				assume(levelsToJump > 0, "jump levels must be > 0", *_current);
+				consume(base::OpCode::LOAD_LITERAL);
 			}
 
-			program.bytecode.push_back(base::Operation(base::OpCode::END_SCOPE, 0));
-			program.bytecode.push_back(base::Operation(base::OpCode::JUMP, 0));
+			bytecode.push_back(base::Operation(base::OpCode::END_SCOPE, 0));
+			bytecode.push_back(base::Operation(base::OpCode::JUMP, 0));
 			scope.pushBreaker(index(), levelsToJump, breakerIt);
 
-			current++; // ";"
-			bytecode.push_back(base::Operation(base::OpCode::POP));
+			consume(base::OpCode::END_STATEMENT);
 		}
 
-		void execute_continue(Iterator& current) {
-			registerBreaker<base::OpCode::CONTINUE>(current);
-		}
-
-		void execute_break(Iterator& current) {
-			registerBreaker<base::OpCode::BREAK>(current);
-		}
-
-		void embeddCodeStatement(Iterator& current, Iterator end) {
-			const auto endStatementIt = std::find_if(current, end, [](const Token& n) {
+		void embeddCodeStatement() {
+			const auto endStatementIt = std::find_if(_current, _end, [](const Token& n) {
 				return n.opCode == base::OpCode::END_STATEMENT;
 			});
-			assume(endStatementIt != end, "Missing end statement!", *current);
+			assume(endStatementIt != _end, "Missing end statement!", *_current);
 
-			program.spliceBytecode(shuntingYard(current, endStatementIt));
-			current = endStatementIt + 1;
+			program.spliceBytecode(shuntingYard(_current, endStatementIt));
+			_current = endStatementIt + 1;
 		}
 
-		void compileStatement(Iterator& current, Iterator end) {
+		void compileStatement() {
 			try {
-				switch (current->opCode) {
+				switch (_current->opCode) {
 					case base::OpCode::TYPE:
 					{
-						assert(std::holds_alternative<std::size_t>(current->value));
-						size_t variableType = std::get<size_t>(current->value);
-						current++;
+						assert(std::holds_alternative<std::size_t>(_current->value));
+						size_t variableType = std::get<size_t>(_current->value);
+						consume(base::OpCode::TYPE);
 
-						assume(std::holds_alternative<std::string>(current->value), "Missing variable name after type declaration", *current);
-						std::string variableName = std::get<std::string>(current->value);
+						assume(std::holds_alternative<std::string>(_current->value), "Missing variable name after type declaration", *_current);
+						std::string variableName = std::get<std::string>(_current->value);
 						const bool unknownVariable = scope.pushVariable(variableName);
-						assume(unknownVariable, "Variable already defined", *current);
+						assume(unknownVariable, "Variable already defined", *_current);
 
-						program.bytecode.push_back(base::Operation(base::OpCode::CREATE_VARIABLE, variableType));
+						bytecode.push_back(base::Operation(base::OpCode::CREATE_VARIABLE, variableType));
 					}
 					break;
 					case base::OpCode::NAME:
-						if ((current + 1)->opCode == base::OpCode::ASSIGN) {
-							assert(std::holds_alternative<std::string>(current->value));
-							base::Operation storeOperation = scope.createStoreOperation(current);
-							current += 2;
-							embeddCodeStatement(current, end);
-							program.bytecode.push_back(std::move(storeOperation));
+						if ((_current + 1)->opCode == base::OpCode::ASSIGN) {
+							assert(std::holds_alternative<std::string>(_current->value));
+							base::Operation storeOperation = scope.createStoreOperation(_current);
+							_current += 2;
+							embeddCodeStatement();
+							bytecode.push_back(std::move(storeOperation));
 
 						} else {
-							embeddCodeStatement(current, end);
+							embeddCodeStatement();
 						}
 						break;
 					case base::OpCode::IF:
-						parse_if(current, end);
+						parse_if();
 						break;
 					case base::OpCode::WHILE:
-						parse_while(current, end);
+						parse_while();
 						break;
-					case base::OpCode::CONTINUE:
-						execute_continue(current);
-						break;
+					case base::OpCode::CONTINUE: // fallthrough
 					case base::OpCode::BREAK:
-						execute_break(current);
+						registerBreaker();
 						break;
 					case base::OpCode::BRACKET_CURLY_OPEN:
-						insertCurlyBrackets(current, end);
+						insertCurlyBrackets();
 						break;
 					case base::OpCode::BRACKET_ROUND_OPEN:
-						insertRoundBrackets(current, end);
+						insertRoundBrackets();
 						break;
 					default:
-						throw ex::ParserException("Unknown token", current->pos);
+						throw ex::ParserException("Unknown token", _current->pos);
 				}
 			} catch (const ex::ParserException& ex) {
 				std::cout << ex.what() << "\n" << source.markedLineAt(ex.getPos()) << std::endl;
-				runToNextSync(current, end);
+				runToNextSync(_current, _end);
 				success = false;
 			}
 		}
@@ -376,10 +372,10 @@ namespace compiler {
 
 		base::Program run() {
 			while (_current != _end) {
-				compileStatement(_current, _end);
+				compileStatement();
 			}
 
-			program.bytecode.push_back(base::Operation(base::OpCode::END_PROGRAM));
+			bytecode.push_back(base::Operation(base::OpCode::END_PROGRAM));
 			return std::move(program);
 		}
 	};
