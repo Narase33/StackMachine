@@ -23,7 +23,7 @@ namespace ex {
 		}
 	};
 
-	void assume(bool condition, const std::string& message) {
+	inline void assume(bool condition, const std::string& message) {
 		if (!condition) {
 			throw ex::Exception(message);
 		}

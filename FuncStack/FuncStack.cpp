@@ -30,6 +30,7 @@ int main(int argc, char* argv[]) {
 
 	printSize<base::Operation>("Operation");
 	printSize<base::BasicType>("BasicType");
+	std::cout << "Number of OpCodes: " << static_cast<int>(base::OpCode::END_ENUM_OPCODE) << std::endl;
 
 	return testReturn;
 }

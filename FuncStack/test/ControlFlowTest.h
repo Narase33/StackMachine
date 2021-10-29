@@ -13,7 +13,12 @@ namespace controlFlowTest {
 	void test_dataStack(std::string&& expression, BasicType expected) {
 		SECTION(expression) {
 			try {
-				Compiler compiler(std::move(expression));
+				std::string code = "int i = 0;\n";
+				code += "func main() {\n";
+				code += expression + "\n";
+				code += "}";
+
+				Compiler compiler(std::move(code));
 				REQUIRE(compiler.isSuccessful());
 
 				StackMachine machine(compiler.getProgram());
@@ -24,7 +29,7 @@ namespace controlFlowTest {
 				std::vector<BasicType> dataStack = machine.getDataStack();
 				//REQUIRE(dataStack.size() == 1);
 
-				REQUIRE(machine.getVariable(0).getInt() == expected.getInt());
+				REQUIRE(machine.getGlobalVariable(0).getInt() == expected.getInt());
 				dataStack.pop_back();
 			} catch (const std::exception& e) {
 				FAIL(e.what());
@@ -35,7 +40,13 @@ namespace controlFlowTest {
 	void test_variable(std::string&& expression, std::vector<BasicType> expected) {
 		SECTION(expression) {
 			try {
-				Compiler compiler(std::move(expression));
+				std::string code = "int i = 0;\n";
+				code += "int j = 0;\n";
+				code += "func main() {\n";
+				code += expression + "\n";
+				code += "}";
+
+				Compiler compiler(std::move(code));
 				REQUIRE(compiler.isSuccessful());
 
 				StackMachine machine(compiler.getProgram());
@@ -46,7 +57,7 @@ namespace controlFlowTest {
 				//REQUIRE(machine.getDataStack().size() == expected.size());
 
 				for (int i = 0; i < expected.size(); i++) {
-					REQUIRE((machine.getVariable(i) == expected[i]).getBool());
+					REQUIRE((machine.getGlobalVariable(i) == expected[i]).getBool());
 				}
 			} catch (const std::exception& e) {
 				FAIL(e.what());
@@ -62,41 +73,40 @@ namespace controlFlowTest {
 
 	TEST_CASE("ControlFlow-Test-if") {
 		// Basic
-		test_dataStack("int i = 0; if ( true ) { i = 2; }", BasicType(2));
-		test_dataStack("int i = 0; if ( false ) { i = 2; }", BasicType(0));
-		test_dataStack("int i = 0; if ( true ) { i = 2; } else { i = 3; }", BasicType(2));
-		test_dataStack("int i = 0; if ( false ) { i = 2; } else { i = 3; }", BasicType(3));
+		test_dataStack("if ( true ) { i = 2; }", BasicType(2));
+		test_dataStack("if ( false ) { i = 2; }", BasicType(0));
+		test_dataStack("if ( true ) { i = 2; } else { i = 3; }", BasicType(2));
+		test_dataStack("if ( false ) { i = 2; } else { i = 3; }", BasicType(3));
 
 		// Complex condition
-		test_dataStack("int i = 0; if ( 1 + 4 == 2 + 3 ) { i = 2; } else { i = 3; }", BasicType(2));
-		test_dataStack("int i = 0; if ( 1 + 4 == 22 + 33 ) { i = 2; } else { i = 3; }", BasicType(3));
+		test_dataStack("if ( 1 + 4 == 2 + 3 ) { i = 2; } else { i = 3; }", BasicType(2));
+		test_dataStack("if ( 1 + 4 == 22 + 33 ) { i = 2; } else { i = 3; }", BasicType(3));
 
 		// Complex negative condition
-		test_dataStack("int i = 0; if ( 1 + 4 != 2 + 3 ) { i = 2; } else { i = 3; }", BasicType(3));
-		test_dataStack("int i = 0; if ( 1 + 4 != 22 + 33 ) { i = 2; } else { i = 3; }", BasicType(2));
+		test_dataStack("if ( 1 + 4 != 2 + 3 ) { i = 2; } else { i = 3; }", BasicType(3));
+		test_dataStack("if ( 1 + 4 != 22 + 33 ) { i = 2; } else { i = 3; }", BasicType(2));
 
 		// else if
-		test_dataStack("int i = 0; if ( false ) { i = 1; } else if ( false ) { i = 2; } else if (false) {i = 3;} else { i = 4; }", BasicType(4));
+		test_dataStack("if ( false ) { i = 1; } else if ( false ) { i = 2; } else if (false) {i = 3;} else { i = 4; }", BasicType(4));
 
-		test_dataStack("int i = 0; if ( false ) { i = 1; } else if ( false ) { i = 2; } else if (true) {i = 3;} else { i = 4; }", BasicType(3));
-		test_dataStack("int i = 0; if ( false ) { i = 1; } else if ( true ) { i = 2; } else if (false) {i = 3;} else { i = 4; }", BasicType(2));
-		test_dataStack("int i = 0; if ( true ) { i = 1; } else if ( false ) { i = 2; } else if (false) {i = 3;} else { i = 4; }", BasicType(1));
+		test_dataStack("if ( false ) { i = 1; } else if ( false ) { i = 2; } else if (true) {i = 3;} else { i = 4; }", BasicType(3));
+		test_dataStack("if ( false ) { i = 1; } else if ( true ) { i = 2; } else if (false) {i = 3;} else { i = 4; }", BasicType(2));
+		test_dataStack("if ( true ) { i = 1; } else if ( false ) { i = 2; } else if (false) {i = 3;} else { i = 4; }", BasicType(1));
 
-		test_dataStack("int i = 0; if ( false ) { i = 1; } else if ( true ) { i = 2; } else if (true) {i = 3;} else { i = 4; }", BasicType(2));
-		test_dataStack("int i = 0; if ( true ) { i = 1; } else if ( true ) { i = 2; } else if (false) {i = 3;} else { i = 4; }", BasicType(1));
-		test_dataStack("int i = 0; if ( true ) { i = 1; } else if ( false ) { i = 2; } else if (true) {i = 3;} else { i = 4; }", BasicType(1));
+		test_dataStack("if ( false ) { i = 1; } else if ( true ) { i = 2; } else if (true) {i = 3;} else { i = 4; }", BasicType(2));
+		test_dataStack("if ( true ) { i = 1; } else if ( true ) { i = 2; } else if (false) {i = 3;} else { i = 4; }", BasicType(1));
+		test_dataStack("if ( true ) { i = 1; } else if ( false ) { i = 2; } else if (true) {i = 3;} else { i = 4; }", BasicType(1));
 
-		test_dataStack("int i = 0; if ( true ) { i = 1; } else if ( true ) { i = 2; } else if (true) {i = 3;} else { i = 4; }", BasicType(1));
+		test_dataStack("if ( true ) { i = 1; } else if ( true ) { i = 2; } else if (true) {i = 3;} else { i = 4; }", BasicType(1));
 
 		// Fails
 
-		test_compileFail("int i = 0; { i = 1;} else {i=2;}");
+		test_compileFail("{ i = 1;} else {i=2;}");
 	}
 
 	TEST_CASE("ControlFlow-Test-while") {
 		// Basic
 		std::string code =
-			"int i = 0;\n"
 			"while (i < 10) {\n"
 			"	i++;\n"
 			"}";
@@ -104,8 +114,6 @@ namespace controlFlowTest {
 
 		// Two variables
 		code =
-			"int i = 0;\n"
-			"int j = 0;\n"
 			"while (i < 10) {\n"
 			"	i++;\n"
 			"	j = j + i;\n"
@@ -114,8 +122,6 @@ namespace controlFlowTest {
 
 		// Combined
 		code =
-			"int i = 0;\n"
-			"int j = 0;\n"
 			"while (i != 10) {\n"
 			"	if (i == 5) {\n"
 			"		j = 5;\n"
@@ -126,8 +132,6 @@ namespace controlFlowTest {
 
 		// Continue
 		code =
-			"int i = 0;\n"
-			"int j = 0;\n"
 			"while (i != 10) {\n"
 			"	i++;\n"
 			"	if (i > 5) {\n"
@@ -139,8 +143,6 @@ namespace controlFlowTest {
 
 		// Break
 		code =
-			"int i = 0;\n"
-			"int j = 0;\n"
 			"while (i != 10) {\n"
 			"	i++;\n"
 			"	j++;\n"
@@ -152,13 +154,11 @@ namespace controlFlowTest {
 
 		// Multi level
 		code =
-			"int i = 0;\n"
-			"int k = 0;\n"
 			"while (i < 5) {\n"
-			"	int j = 0;\n"
-			"	while (j < 5) {\n"
-			"		k++;\n"
+			"	int k = 0;\n"
+			"	while (k < 5) {\n"
 			"		j++;\n"
+			"		k++;\n"
 			"	}\n"
 			"	i++;\n"
 			"}";
@@ -166,14 +166,12 @@ namespace controlFlowTest {
 
 		// Multi level break
 		code =
-			"int i = 0;\n"
-			"int k = 0;\n"
 			"while (i < 5) {\n"
-			"	int j = 0;\n"
-			"	while (j < 5) {\n"
-			"		k++;\n"
+			"	int k = 0;\n"
+			"	while (k < 5) {\n"
 			"		j++;\n"
-			"		if (k == 8) {\n"
+			"		k++;\n"
+			"		if (j == 8) {\n"
 			"			break 2;\n"
 			"		}\n"
 			"	}\n"
@@ -183,17 +181,15 @@ namespace controlFlowTest {
 
 		// Multi level continue
 		code =
-			"int i = 0;\n"
-			"int k = 0;\n"
 			"while (i < 5) {\n"
-			"	int j = 0;\n"
+			"	int k = 0;\n"
 			"	i++;\n"
-			"	while (j < 5) {\n"
-			"		j++;\n"
-			"		if (k == 8) {\n"
+			"	while (k < 5) {\n"
+			"		k++;\n"
+			"		if (j == 8) {\n"
 			"			continue 2;\n"
 			"		}\n"
-			"		k++;\n"
+			"		j++;\n"
 			"	}\n"
 			"}";
 		test_variable(std::move(code), { BasicType(5), BasicType(8) });

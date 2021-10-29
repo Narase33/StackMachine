@@ -12,13 +12,13 @@ namespace compiler {
 	using Iterator = std::string::const_iterator;
 	using ExtractorResult = std::optional<Token>;
 
-	void skipWhitespace(Iterator& current, Iterator end) {
+	inline void skipWhitespace(Iterator& current, Iterator end) {
 		while ((current != end) and std::isspace(*current)) {
 			current++;
 		}
 	}
 
-	bool partOfVariableName(char c) {
+	inline bool partOfVariableName(char c) {
 		return std::isalpha(c) or (c == '_');
 	};
 

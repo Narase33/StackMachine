@@ -15,6 +15,7 @@ namespace stackmachine {
 			: program(std::move(toExecute)) {
 			pc = program.bytecode.begin();
 			dataStackScopes.push(0);
+			functionsStackScopes.push(0);
 		}
 
 		size_t addVariable(base::BasicType variableValue) {
@@ -23,11 +24,23 @@ namespace stackmachine {
 		}
 
 		void setVariable(size_t offset, base::BasicType variableValue) {
+			offset += functionsStackScopes.top();
 			assert(offset < dataStack.size());
 			dataStack[offset] = std::move(variableValue);
 		}
 
 		base::BasicType getVariable(size_t offset) const {
+			offset += functionsStackScopes.top();
+			assert(offset < dataStack.size());
+			return dataStack[offset];
+		}
+
+		void setGlobalVariable(size_t offset, base::BasicType variableValue) {
+			assert(offset < dataStack.size());
+			dataStack[offset] = std::move(variableValue);
+		}
+
+		base::BasicType getGlobalVariable(size_t offset) const {
 			assert(offset < dataStack.size());
 			return dataStack[offset];
 		}
@@ -55,12 +68,18 @@ namespace stackmachine {
 					case base::OpCode::CREATE_VARIABLE:
 						dataStack.push_back(base::BasicType::fromId(static_cast<base::TypeIndex>(pc->unsignedData())));
 						break;
+					case base::OpCode::STORE_GLOBAL:
+						setGlobalVariable(pc->unsignedData(), dataStack.back());
+						break;
+					case base::OpCode::LOAD_GLOBAL:
+						dataStack.push_back(getGlobalVariable(pc->unsignedData()));
+						break;
 					case base::OpCode::JUMP:
-						pc += pc->signedData(); // loop will increment +1
+						pc += pc->signedData();
 						break;
 					case base::OpCode::JUMP_IF_NOT:
 						if (pop().getBool() == false) {
-							pc += pc->signedData(); // loop will increment +1
+							pc += pc->signedData();
 						}
 						break;
 					case base::OpCode::BEGIN_SCOPE:
@@ -71,6 +90,16 @@ namespace stackmachine {
 							dataStack.erase(dataStack.begin() + dataStackScopes.top(), dataStack.end());
 							dataStackScopes.pop();
 						}
+						break;
+					case base::OpCode::CALL_FUNCTION:
+						functionCalls.push(pc);
+						functionsStackScopes.push(dataStack.size());
+						pc += pc->signedData();
+						break;
+					case base::OpCode::END_FUNCTION:
+						pc = functionCalls.top();
+						functionCalls.pop();
+						functionsStackScopes.pop();
 						break;
 						// ==== COMPARE ====
 					case base::OpCode::EQ:
@@ -164,10 +193,15 @@ namespace stackmachine {
 		}
 
 	private:
+		using PcType = std::vector<base::Operation>::const_iterator;
+
 		std::stack<size_t, std::vector<size_t>> dataStackScopes;
+		std::stack<size_t, std::vector<size_t>> functionsStackScopes;
+		std::stack<PcType, std::vector<PcType>> functionCalls;
 		std::vector<base::BasicType> dataStack;
+
 		base::Program program;
-		std::vector<base::Operation>::const_iterator pc;
+		PcType pc;
 
 		base::BasicType pop() {
 			base::BasicType data = dataStack.back();

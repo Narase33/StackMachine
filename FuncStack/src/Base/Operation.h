@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 #include "OpCode.h"
 #include "BasicType.h"
 
@@ -58,4 +60,6 @@ namespace base {
 			uint32_t unsignedData;
 		} as;
 	};
+
+	using Bytecode = std::vector<Operation>;
 }

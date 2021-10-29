@@ -12,7 +12,12 @@ namespace parserTest {
 	void test(std::string&& expression, base::BasicType expected) {
 		SECTION(expression) {
 			try {
-				Compiler compiler(std::move(expression));
+				std::string code = "int i = 0;\n";
+				code += "func main() {\n";
+				code += expression + "\n";
+				code += "}";
+
+				Compiler compiler(std::move(code));
 				REQUIRE(compiler.isSuccessful());
 
 				StackMachine machine(compiler.getProgram());
@@ -21,7 +26,7 @@ namespace parserTest {
 
 				INFO(machine.toString());
 				//REQUIRE(machine.getDataStack().size() == 1);
-				REQUIRE((machine.getVariable(0) == expected).getBool());
+				REQUIRE((machine.getGlobalVariable(0) == expected).getBool());
 			} catch (const std::exception& e) {
 				FAIL(e.what());
 			}
@@ -29,31 +34,31 @@ namespace parserTest {
 	}
 
 	TEST_CASE("Parser-Test") {
-		test("int i = 6 + 2;", base::BasicType(6 + 2));
-		test("int i = 6+2;", base::BasicType(6 + 2));
-		test("int i = 6 - 2;", base::BasicType(6 - 2));
-		test("int i = 6-2;", base::BasicType(6 - 2));
-		test("int i = 6 * 2;", base::BasicType(6 * 2));
-		test("int i = 6*2;", base::BasicType(6 * 2));
-		test("int i = 6 / 2;", base::BasicType(6 / 2));
-		test("int i = 6/2;", base::BasicType(6 / 2));
-		test("int i = 3 ++;", base::BasicType(3 + 1));
-		test("int i = 3++;", base::BasicType(3 + 1));
-		test("int i = 3 --;", base::BasicType(3 - 1));
-		test("int i = 3--;", base::BasicType(3 - 1));
+		test("i = 6 + 2;", base::BasicType(6 + 2));
+		test("i = 6+2;", base::BasicType(6 + 2));
+		test("i = 6 - 2;", base::BasicType(6 - 2));
+		test("i = 6-2;", base::BasicType(6 - 2));
+		test("i = 6 * 2;", base::BasicType(6 * 2));
+		test("i = 6*2;", base::BasicType(6 * 2));
+		test("i = 6 / 2;", base::BasicType(6 / 2));
+		test("i = 6/2;", base::BasicType(6 / 2));
+		test("i = 3 ++;", base::BasicType(3 + 1));
+		test("i = 3++;", base::BasicType(3 + 1));
+		test("i = 3 --;", base::BasicType(3 - 1));
+		test("i = 3--;", base::BasicType(3 - 1));
 
-		test("int i = 1 + 2 + 3;", base::BasicType(1 + 2 + 3));
-		test("int i = 12 - 2 - 3;", base::BasicType(12 - 2 - 3));
-		test("int i = 1 * 2 * 3;", base::BasicType(1 * 2 * 3));
-		test("int i = 12 / 2 / 3;", base::BasicType(12 / 2 / 3));
+		test("i = 1 + 2 + 3;", base::BasicType(1 + 2 + 3));
+		test("i = 12 - 2 - 3;", base::BasicType(12 - 2 - 3));
+		test("i = 1 * 2 * 3;", base::BasicType(1 * 2 * 3));
+		test("i = 12 / 2 / 3;", base::BasicType(12 / 2 / 3));
 
-		test("int i = 1 + 2 * 3;", base::BasicType(1 + 2 * 3));
-		test("int i = 1 + 2 * 3 + 4;", base::BasicType(1 + 2 * 3 + 4));
-		test("int i = 1 + 2 * 3 + 4 * 5;", base::BasicType(1 + 2 * 3 + 4 * 5));
-		test("int i = 1 + 2 * 3 + 4 * 5 + 6;", base::BasicType(1 + 2 * 3 + 4 * 5 + 6));
+		test("i = 1 + 2 * 3;", base::BasicType(1 + 2 * 3));
+		test("i = 1 + 2 * 3 + 4;", base::BasicType(1 + 2 * 3 + 4));
+		test("i = 1 + 2 * 3 + 4 * 5;", base::BasicType(1 + 2 * 3 + 4 * 5));
+		test("i = 1 + 2 * 3 + 4 * 5 + 6;", base::BasicType(1 + 2 * 3 + 4 * 5 + 6));
 
-		test("int i = 2 * ( 1 + 1 ) * 2;", base::BasicType(2 * (1 + 1) * 2));
-		test("int i = 2 * ( 1 + 1 ) * ( 2 + 2 ) * 3;", base::BasicType(2 * (1 + 1) * (2 + 2) * 3));
-		test("int i = 2 * ( ( 1 + 1 ) + ( 2 + 2 ) ) * 3;", base::BasicType(2 * ((1 + 1) + (2 + 2)) * 3));
+		test("i = 2 * ( 1 + 1 ) * 2;", base::BasicType(2 * (1 + 1) * 2));
+		test("i = 2 * ( 1 + 1 ) * ( 2 + 2 ) * 3;", base::BasicType(2 * (1 + 1) * (2 + 2) * 3));
+		test("i = 2 * ( ( 1 + 1 ) + ( 2 + 2 ) ) * 3;", base::BasicType(2 * ((1 + 1) + (2 + 2)) * 3));
 	}
 }

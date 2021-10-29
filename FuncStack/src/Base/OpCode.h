@@ -8,14 +8,14 @@ namespace base {
 		ERR, NOOP,
 
 		// Lexer
-		END_STATEMENT,
+		END_STATEMENT, COMMA,
 		IF, ELSE, WHILE,
 		CONTINUE, BREAK,
 		BRACKET_ROUND_OPEN, BRACKET_ROUND_CLOSE,
 		BRACKET_CURLY_OPEN, BRACKET_CURLY_CLOSE,
 		BRACKET_SQUARE_OPEN, BRACKET_SQUARE_CLOSE,
 		TYPE,
-		NAME,
+		NAME, FUNC,
 
 		// Lexer + Interpreter
 		LOAD_LITERAL,
@@ -27,23 +27,25 @@ namespace base {
 		ASSIGN,
 
 		// Interpreter
-		BEGIN_SCOPE, END_SCOPE,
+		BEGIN_SCOPE, END_SCOPE, CALL_FUNCTION, END_FUNCTION,
 		END_PROGRAM,
-		LOAD_VARIABLE, STORE,
+		LOAD_VARIABLE, LOAD_GLOBAL, STORE, STORE_GLOBAL,
 		JUMP, JUMP_IF_NOT,
-		CREATE_VARIABLE, POP,
+		CREATE_VARIABLE, CREATE_GLOBAL, POP,
+		END_ENUM_OPCODE
 	};
 
-	OpCode opCodeFromKeyword(const std::string_view keyword) {
+	inline OpCode opCodeFromKeyword(const std::string_view keyword) {
 		if (keyword == "if") return OpCode::IF;
 		if (keyword == "else") return OpCode::ELSE;
 		if (keyword == "while") return OpCode::WHILE;
 		if (keyword == "continue") return OpCode::CONTINUE;
 		if (keyword == "break") return OpCode::BREAK;
+		if (keyword == "func") return OpCode::FUNC;
 		return OpCode::ERR;
 	}
 
-	OpCode opCodeFromSymbol(const std::string_view symbol) {
+	inline OpCode opCodeFromSymbol(const std::string_view symbol) {
 		if (symbol.length() == 1) {
 			switch (symbol[0]) {
 				case '(': return OpCode::BRACKET_ROUND_OPEN;
@@ -70,7 +72,7 @@ namespace base {
 		return OpCode::ERR;
 	}
 
-	int opCodePriority(OpCode opCode) {
+	inline int opCodePriority(OpCode opCode) {
 		switch (opCode) {
 			case OpCode::LOAD_LITERAL: return 1;
 			case OpCode::NAME: return 0;
@@ -91,7 +93,7 @@ namespace base {
 		return -1;
 	}
 
-	int opCodeImpact(OpCode opCode) {
+	inline int opCodeImpact(OpCode opCode) {
 		switch (opCode) {
 			case base::OpCode::LOAD_VARIABLE:
 			case base::OpCode::NAME:
@@ -116,7 +118,7 @@ namespace base {
 		throw ex::Exception("Unknown opCode " + std::to_string(static_cast<size_t>(opCode)));
 	}
 
-	std::pair<OpCode, OpCode> getBracketGroup(OpCode openBracket) {
+	inline std::pair<OpCode, OpCode> getBracketGroup(OpCode openBracket) {
 		switch (openBracket) {
 			case OpCode::BRACKET_ROUND_OPEN:
 			case OpCode::BRACKET_ROUND_CLOSE: return { OpCode::BRACKET_ROUND_OPEN, OpCode::BRACKET_ROUND_CLOSE };
@@ -128,7 +130,7 @@ namespace base {
 		}
 	}
 
-	bool isOpeningBracket(OpCode op) {
+	inline bool isOpeningBracket(OpCode op) {
 		switch (op) {
 			case OpCode::BRACKET_ROUND_OPEN:
 			case OpCode::BRACKET_CURLY_OPEN:
@@ -138,7 +140,7 @@ namespace base {
 		}
 	}
 
-	bool isClosingBracket(OpCode op) {
+	inline bool isClosingBracket(OpCode op) {
 		switch (op) {
 			case OpCode::BRACKET_ROUND_CLOSE:
 			case OpCode::BRACKET_CURLY_CLOSE:
@@ -148,12 +150,12 @@ namespace base {
 		}
 	}
 
-	bool isBracket(OpCode op) {
+	inline bool isBracket(OpCode op) {
 		return isOpeningBracket(op) or isClosingBracket(op);
 	}
 
 #define SM_REGISTER_NAME(x) case x: return #x
-	std::string opCodeName(OpCode opCode) {
+	inline std::string opCodeName(OpCode opCode) {
 		switch (opCode) {
 			// Global
 			SM_REGISTER_NAME(OpCode::NOOP);
@@ -162,6 +164,7 @@ namespace base {
 			// Lexer
 			SM_REGISTER_NAME(OpCode::TYPE);
 			SM_REGISTER_NAME(OpCode::END_STATEMENT);
+			SM_REGISTER_NAME(OpCode::COMMA);
 			SM_REGISTER_NAME(OpCode::IF);
 			SM_REGISTER_NAME(OpCode::ELSE);
 			SM_REGISTER_NAME(OpCode::WHILE);
@@ -174,11 +177,14 @@ namespace base {
 			SM_REGISTER_NAME(OpCode::BRACKET_CURLY_OPEN);
 			SM_REGISTER_NAME(OpCode::BRACKET_CURLY_CLOSE);
 			SM_REGISTER_NAME(OpCode::NAME);
+			SM_REGISTER_NAME(OpCode::FUNC);
 
 			// Lexer + Interpreter
 			SM_REGISTER_NAME(OpCode::LOAD_LITERAL);
 			SM_REGISTER_NAME(OpCode::BEGIN_SCOPE);
 			SM_REGISTER_NAME(OpCode::END_SCOPE);
+			SM_REGISTER_NAME(OpCode::CALL_FUNCTION);
+			SM_REGISTER_NAME(OpCode::END_FUNCTION);
 			SM_REGISTER_NAME(OpCode::EQ);
 			SM_REGISTER_NAME(OpCode::UNEQ);
 			SM_REGISTER_NAME(OpCode::BIGGER);
@@ -194,10 +200,13 @@ namespace base {
 			// Interpreter
 			SM_REGISTER_NAME(OpCode::END_PROGRAM);
 			SM_REGISTER_NAME(OpCode::LOAD_VARIABLE);
+			SM_REGISTER_NAME(OpCode::LOAD_GLOBAL);
 			SM_REGISTER_NAME(OpCode::STORE);
+			SM_REGISTER_NAME(OpCode::STORE_GLOBAL);
 			SM_REGISTER_NAME(OpCode::JUMP);
 			SM_REGISTER_NAME(OpCode::JUMP_IF_NOT);
 			SM_REGISTER_NAME(OpCode::CREATE_VARIABLE);
+			SM_REGISTER_NAME(OpCode::CREATE_GLOBAL);
 			SM_REGISTER_NAME(OpCode::POP);
 		}
 		return "";

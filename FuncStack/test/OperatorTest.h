@@ -12,7 +12,12 @@ namespace operatorTest {
 	void test(std::string&& expression, base::BasicType expected) {
 		SECTION(expression) {
 			try {
-				Compiler compiler(std::move(expression));
+				std::string code = "int i = 0;\n";
+				code += "func main() {\n";
+				code += expression + "\n";
+				code += "}";
+
+				Compiler compiler(std::move(code));
 				REQUIRE(compiler.isSuccessful());
 
 				StackMachine machine(compiler.getProgram());
@@ -21,7 +26,7 @@ namespace operatorTest {
 
 				INFO(machine.toString());
 				//REQUIRE(machine.getDataStack().size() == 1);
-				REQUIRE((machine.getVariable(0) == expected).getBool());
+				REQUIRE((machine.getGlobalVariable(0) == expected).getBool());
 			} catch (const std::exception& e) {
 				FAIL(e.what());
 			}
@@ -29,11 +34,11 @@ namespace operatorTest {
 	}
 
 	TEST_CASE("Operator-Test") {
-		test("int i = 6 + 2;", base::BasicType(8));
-		test("int i = 6 - 2;", base::BasicType(4));
-		test("int i = 6 * 2;", base::BasicType(12));
-		test("int i = 6 / 2;", base::BasicType(3));
-		test("int i = 6++;", base::BasicType(7));
-		test("int i = 6--;", base::BasicType(5));
+		test("i = 6 + 2;", base::BasicType(8));
+		test("i = 6 - 2;", base::BasicType(4));
+		test("i = 6 * 2;", base::BasicType(12));
+		test("i = 6 / 2;", base::BasicType(3));
+		test("i = 6++;", base::BasicType(7));
+		test("i = 6--;", base::BasicType(5));
 	}
 }

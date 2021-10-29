@@ -7,6 +7,8 @@
 #include <vector>
 
 #include "ScopeDict.h"
+#include "Token.h"
+#include "Function.h"
 
 #include "src/Base/Source.h"
 #include "src/Base/Program.h"
@@ -21,9 +23,10 @@ namespace compiler {
 		Iterator _current;
 
 		ScopeDict scope;
+		FunctionCache functions;
 
 		base::Program program;
-		std::vector<base::Operation>& bytecode = program.bytecode;
+		base::Bytecode& bytecode = program.bytecode;
 		std::vector<base::BasicType>& literals = program.constants;
 
 		bool success = true;
@@ -32,13 +35,28 @@ namespace compiler {
 			return bytecode.size() - 1;
 		}
 
-		void consume(base::OpCode expected, const std::string& message) {
-			assume((_current != _end) and (_current->opCode == expected), message, *_current);
-			_current++;
+		void rewireJump(size_t from, size_t to) {
+			base::Operation& jump = bytecode[from];
+			assume(utils::any_of(jump.getOpCode(), { base::OpCode::JUMP, base::OpCode::JUMP_IF_NOT, base::OpCode::CALL_FUNCTION }), "expected to rewire jump", *(_current-1));
+			int32_t jumpDistance = to - from;
+			if (jumpDistance < 0) jumpDistance--;
+			jump.signedData() = jumpDistance;
 		}
 
-		void consume(base::OpCode expected) {
-			consume(expected, "Expected " + opCodeName(expected) + ", got " + opCodeName(_current->opCode));
+		void insertJump(base::OpCode jump, size_t from, size_t to) {
+			assume(utils::any_of(jump, { base::OpCode::JUMP, base::OpCode::JUMP_IF_NOT, base::OpCode::CALL_FUNCTION }), "expected to rewire jump", *(_current - 1));
+			int32_t jumpDistance = to - from;
+			if (jumpDistance < 0) jumpDistance--;
+			bytecode.push_back(base::Operation(jump, jumpDistance));
+		}
+
+		const Token& consume(base::OpCode expected, const std::string& message) {
+			assume((_current != _end) and (_current->opCode == expected), message, *_current);
+			return *_current++;
+		}
+
+		const Token& consume(base::OpCode expected) {
+			return consume(expected, "Expected " + opCodeName(expected) + ", got " + opCodeName(_current->opCode));
 		}
 
 		void assume(bool condition, const std::string& message, const Token& t) const {
@@ -70,7 +88,7 @@ namespace compiler {
 			} else if (std::holds_alternative<base::sm_bool>(_current->value)) {
 				return base::BasicType(std::get<base::sm_bool>(_current->value));
 			}
-			ex::ParserException("Unknown value", _current->pos);
+			throw ex::ParserException("Unknown value", _current->pos);
 		}
 
 		Iterator unwindGroup() {
@@ -99,15 +117,34 @@ namespace compiler {
 			assume(score == 1, "Plausibility check failed", *current);
 		}
 
-		std::vector<base::Operation> shuntingYard(Iterator current, Iterator end) {
+		Token top_and_pop(std::stack<Token, std::vector<Token>>& stack) {
+			Token t = stack.top();
+			stack.pop();
+			return t;
+		}
+
+		void shuntingYard(Iterator current, Iterator end) {
 			const Iterator this_current_copy = current;
 
 			std::stack<Token, std::vector<Token>> operatorStack;
 			std::vector<Token> sortedTokens;
 
 			for (; current != end; current++) {
-				if ((current->opCode == base::OpCode::LOAD_LITERAL) or (current->opCode == base::OpCode::NAME)) {
+				if (current->opCode == base::OpCode::COMMA) {
+					continue;
+				}
+
+				if (current->opCode == base::OpCode::LOAD_LITERAL) {
 					sortedTokens.push_back(*current);
+					continue;
+				}
+
+				if (current->opCode == base::OpCode::NAME) {
+					if ((current + 1)->opCode == base::OpCode::BRACKET_ROUND_OPEN) {
+						operatorStack.push(*current);
+					} else {
+						sortedTokens.push_back(*current);
+					}
 					continue;
 				}
 
@@ -121,73 +158,70 @@ namespace compiler {
 
 					while (!operatorStack.empty() and (operatorStack.top().opCode != bracketOpen)) {
 						assume(!base::isOpeningBracket(operatorStack.top().opCode), "Found closing bracket that doesnt match", *current);
-						sortedTokens.push_back(operatorStack.top());
-						operatorStack.pop();
+						sortedTokens.push_back(top_and_pop(operatorStack));
 					}
 					assume(operatorStack.size() > 0, "Group didnt end", *this_current_copy);
 
 					operatorStack.pop();
-					// TODO As soon as there are functions implemented
-					// if (operatorStack.top() is function) {
-					//		sortedTokens.push_back(operatorStack.top());
-					//		operatorStack.pop();
-					// }
+
+					if (operatorStack.top().opCode == base::OpCode::NAME) {
+						sortedTokens.push_back(top_and_pop(operatorStack));
+					}
+
 					continue;
 				}
 
 				while (!operatorStack.empty() and (getCheckedPriority(operatorStack.top()) >= getCheckedPriority(*current))) {
-					sortedTokens.push_back(operatorStack.top());
-					operatorStack.pop();
+					sortedTokens.push_back(top_and_pop(operatorStack));
 				}
 				operatorStack.push(*current);
 			}
 
 			while (!operatorStack.empty()) {
-				sortedTokens.push_back(operatorStack.top());
-				operatorStack.pop();
+				sortedTokens.push_back(top_and_pop(operatorStack));
 			}
 
 			checkPlausibility(current, sortedTokens);
 
-			std::vector<base::Operation> subProgram;
 			for (auto it = sortedTokens.begin(); it != sortedTokens.end(); it++) {
 				const base::OpCode opCode = it->opCode;
 				switch (opCode) {
-					case base::OpCode::INCR: // fallthrough
+					case base::OpCode::INCR: // ->
 					case base::OpCode::DECR:
 					{
-						subProgram.push_back(base::Operation(opCode));
+						bytecode.push_back(base::Operation(opCode));
 
 						const Iterator prev = it - 1;
 						if (prev->opCode == base::OpCode::NAME) {
-							subProgram.push_back(scope.createStoreOperation(prev));
+							bytecode.push_back(scope.createStoreOperation(prev));
 						}
 					}
 					break;
-					case base::OpCode::ADD: // fallthrough
-					case base::OpCode::SUB: // fallthrough
-					case base::OpCode::MULT: // fallthrough
-					case base::OpCode::DIV: // fallthrough
-					case base::OpCode::EQ: // fallthrough
-					case base::OpCode::UNEQ: // fallthrough
-					case base::OpCode::BIGGER: // fallthrough
+					case base::OpCode::ADD: // ->
+					case base::OpCode::SUB: // ->
+					case base::OpCode::MULT: // ->
+					case base::OpCode::DIV: // ->
+					case base::OpCode::EQ: // ->
+					case base::OpCode::UNEQ: // ->
+					case base::OpCode::BIGGER: // ->
 					case base::OpCode::LESS:
-						subProgram.push_back(base::Operation(opCode));
+						bytecode.push_back(base::Operation(opCode));
 						break;
 					case base::OpCode::LOAD_LITERAL:
-						subProgram.push_back(base::Operation(base::OpCode::LOAD_LITERAL, program.addConstant(literalToValue(it))));
+						bytecode.push_back(base::Operation(base::OpCode::LOAD_LITERAL, program.addConstant(literalToValue(it))));
 						break;
 					case base::OpCode::NAME:
-					{
-						subProgram.push_back(scope.createLoadOperation(it));
-					}
-					break;
+						if (functions.has(it->get<std::string>())) {
+							const int32_t jumpDistance = functions.offset(it->get<std::string>()).value() - index();
+							bytecode.push_back(base::Operation(base::OpCode::CALL_FUNCTION, jumpDistance));
+						} else {
+							bytecode.push_back(scope.createLoadOperation(it));
+						}
+						break;
 					default:
 						throw ex::ParserException("Unknown token after shunting yard", current->pos);
 				}
 			}
-
-			return subProgram;
 		}
 
 		void insertCurlyBrackets() {
@@ -207,7 +241,7 @@ namespace compiler {
 
 		void insertRoundBrackets() {
 			const Iterator beginCondition = unwindGroup();
-			program.spliceBytecode(shuntingYard(beginCondition, _current));
+			shuntingYard(beginCondition, _current);
 			consume(base::OpCode::BRACKET_ROUND_CLOSE);
 		}
 
@@ -276,6 +310,54 @@ namespace compiler {
 			}
 		}
 
+		Function::Variable extractParameter() {
+			const Token& paramType = consume(base::OpCode::TYPE);
+			const Token& paramName = consume(base::OpCode::NAME);
+			return Function::Variable{ static_cast<base::TypeIndex>(paramType.get<size_t>()), paramName.get<std::string>() };
+		}
+
+		std::vector<Function::Variable> extractFunctionParameters() {
+			std::vector<Function::Variable> parameters;
+
+			consume(base::OpCode::BRACKET_ROUND_OPEN);
+			if (_current->opCode == base::OpCode::TYPE) {
+				parameters.push_back(extractParameter());
+
+				while (_current->opCode == base::OpCode::COMMA) {
+					consume(base::OpCode::COMMA);
+					parameters.push_back(extractParameter());
+				}
+			}
+			consume(base::OpCode::BRACKET_ROUND_CLOSE);
+			return parameters;
+		}
+
+		void parse_function() { // TODO optimize
+			assume(scope.level() == 0, "Function declarations allowed only on global scope", *_current);
+			consume(base::OpCode::FUNC);
+
+			std::optional<base::TypeIndex> returnType;
+			if (_current->opCode == base::OpCode::TYPE) {
+				returnType = static_cast<base::TypeIndex>(std::get<size_t>(_current->value));
+				consume(base::OpCode::TYPE);
+			}
+
+			const Token& functionName = consume(base::OpCode::NAME, "Expected function name after declaration");
+
+			std::vector<Function::Variable> parameters = extractFunctionParameters();
+
+
+			bytecode.push_back(base::Operation(base::OpCode::JUMP, 0));
+			const size_t jumpIndex = index();
+			
+			bool isNewFunction = functions.push(functionName.get<std::string>(), returnType, std::move(parameters), index());
+			assume(isNewFunction, "Function already known", *_current);
+
+			compileStatement();
+			bytecode.push_back(base::Operation(base::OpCode::END_FUNCTION));
+			rewireJump(jumpIndex, index());
+		}
+
 		void registerBreaker() {
 			const Iterator breakerIt = _current;
 			size_t levelsToJump = 1;
@@ -302,7 +384,7 @@ namespace compiler {
 			});
 			assume(endStatementIt != _end, "Missing end statement!", *_current);
 
-			program.spliceBytecode(shuntingYard(_current, endStatementIt));
+			shuntingYard(_current, endStatementIt);
 			_current = endStatementIt + 1;
 		}
 
@@ -317,12 +399,12 @@ namespace compiler {
 
 						assume(std::holds_alternative<std::string>(_current->value), "Missing variable name after type declaration", *_current);
 						std::string variableName = std::get<std::string>(_current->value);
-						const bool unknownVariable = scope.pushVariable(variableName);
-						assume(unknownVariable, "Variable already defined", *_current);
 
+						const bool unknownVariable = scope.pushVariable(variableName, variableType);
+						assume(unknownVariable, "Variable already defined", *_current);
 						bytecode.push_back(base::Operation(base::OpCode::CREATE_VARIABLE, variableType));
 					}
-					break;
+					// ->
 					case base::OpCode::NAME:
 						if ((_current + 1)->opCode == base::OpCode::ASSIGN) {
 							assert(std::holds_alternative<std::string>(_current->value));
@@ -330,7 +412,6 @@ namespace compiler {
 							_current += 2;
 							embeddCodeStatement();
 							bytecode.push_back(std::move(storeOperation));
-
 						} else {
 							embeddCodeStatement();
 						}
@@ -341,6 +422,9 @@ namespace compiler {
 					case base::OpCode::WHILE:
 						parse_while();
 						break;
+					case base::OpCode::FUNC:
+						parse_function();
+					break;
 					case base::OpCode::CONTINUE: // fallthrough
 					case base::OpCode::BREAK:
 						registerBreaker();
@@ -371,11 +455,23 @@ namespace compiler {
 		}
 
 		base::Program run() {
+
 			while (_current != _end) {
-				compileStatement();
+				switch (_current->opCode) {
+					case base::OpCode::TYPE:
+					case base::OpCode::FUNC:
+						compileStatement();
+						break;
+					default:
+						throw ex::ParserException("Only declarations allowed on global scope", _current->pos);
+				}
 			}
 
+			const std::optional<size_t> mainPosition = functions.offset("main", {}, {});
+			assume(mainPosition.has_value(), "No main function in code", *(_current - 1));
+			insertJump(base::OpCode::CALL_FUNCTION, index(), mainPosition.value());
 			bytecode.push_back(base::Operation(base::OpCode::END_PROGRAM));
+
 			return std::move(program);
 		}
 	};

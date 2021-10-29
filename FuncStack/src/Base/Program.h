@@ -6,11 +6,11 @@
 
 namespace base {
 	struct Program {
-		std::vector<base::Operation> bytecode;
-		std::vector<base::BasicType> constants;
+		Bytecode bytecode;
+		std::vector<BasicType> constants;
 
-		size_t addConstant(base::BasicType value) {
-			const auto pos = std::find_if(constants.begin(), constants.end(), [&](const base::BasicType& b) {
+		size_t addConstant(BasicType value) {
+			const auto pos = std::find_if(constants.begin(), constants.end(), [&](const BasicType& b) {
 				return (b == value).getBool();
 			});
 
@@ -22,12 +22,12 @@ namespace base {
 			return index;
 		}
 
-		const base::BasicType& getConstant(size_t index) const {
+		const BasicType& getConstant(size_t index) const {
 			assert(constants.size() > index);
 			return constants[index];
 		}
 
-		void spliceBytecode(std::vector<base::Operation> toSplice) {
+		void spliceBytecode(std::vector<Operation> toSplice) {
 			bytecode.insert(bytecode.end(), toSplice.begin(), toSplice.end());
 		}
 	};

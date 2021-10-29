@@ -3,6 +3,58 @@
 #include "Token.h"
 
 namespace compiler {
+	template <typename T>
+	class EntityContainer {
+		using Iterator = std::vector<T>::const_iterator;
+
+	public:
+		bool add(T t) {
+			if (has(t)) {
+				return false;
+			}
+
+			entities.push_back(std::move(t));
+			return true;
+		}
+
+		bool has(const T& other) const {
+			return _getIt(other) != entities.end();
+		}
+
+		std::optional<size_t> offset(const T& other) const {
+			const auto pos = _getIt(other);
+			if (pos != entities.end()) {
+				return std::distance(entities.begin(), pos);
+			}
+			return {};
+		}
+
+		Iterator begin() const {
+			return entities.begin();
+		}
+
+		Iterator end() const {
+			return entities.end();
+		}
+
+		std::vector<T>& list() {
+			return entities;
+		}
+
+		const std::vector<T>& list() const {
+			return entities;
+		}
+
+	private:
+		std::vector<T> entities;
+
+		const Iterator _getIt(const T& other) const {
+			return std::find_if(entities.begin(), entities.end(), [&](const T& t) {
+				return t == other;
+			});
+		}
+	};
+
 	class ScopeDict {
 		using Iterator = std::vector<Token>::const_iterator;
 
@@ -15,6 +67,11 @@ namespace compiler {
 		struct Variable {
 			size_t level;
 			std::string name;
+			size_t type;
+
+			bool operator==(const Variable& other) const {
+				return this->name == other.name;
+			}
 		};
 
 		ScopeDict() = default;
@@ -27,7 +84,7 @@ namespace compiler {
 			const auto pos = std::find_if(variables.begin(), variables.end(), [=](const Variable& v) {
 				return v.level == scopeLevel;
 			});
-			variables.erase(pos, variables.end());
+			variables.list().erase(pos, variables.end());
 			scopeLevel--;
 		}
 
@@ -57,53 +114,84 @@ namespace compiler {
 			return toResolve;
 		}
 
-		bool pushVariable(const std::string& variableName) {
-			if (hasVariable(variableName)) {
-				return false;
-			}
-
-			variables.push_back({ scopeLevel, variableName });
-			return true;
-		}
-
-		std::optional<size_t> offsetVariable(const std::string& variableName) const {
-			const auto pos = _getVariableIt(variableName);
-			if (pos != variables.end()) {
-				return std::distance(variables.begin(), pos);
-			}
-			return {};
-		}
-
-		bool hasVariable(const std::string& variableName) const {
-			return _getVariableIt(variableName) != variables.end();
-		}
-
 		size_t level() const {
 			return scopeLevel;
 		}
 
+		// ==== Local variables ====
+
+		bool pushVariable(const std::string& variableName, size_t type) {
+			if (hasVariable(variableName)) {
+				return false;
+			}
+
+			if (scopeLevel == 0) {
+				return globalVariables.add({ scopeLevel, variableName, type });
+			}
+			return variables.add({ scopeLevel, variableName, type });
+		}
+
+		bool hasVariable(const std::string& variableName) const {
+			return variables.has({ 0, variableName, 0 })
+				or globalVariables.has({ 0, variableName, 0 });
+		}
+
+		std::optional<size_t> offsetLocalVariable(const std::string& variableName) const {
+			return variables.offset({ 0, variableName, 0 });
+		}
+
+		std::optional<size_t> offsetGlobalVariable(const std::string& variableName) const {
+			return globalVariables.offset({ 0, variableName, 0 });
+		}
+
+		std::vector<base::Operation> globalStoreVariableList() const {
+			std::vector<base::Operation> list;
+			for (const Variable& v : globalVariables) {
+				list.push_back(base::Operation(base::OpCode::CREATE_VARIABLE, v.type));
+			}
+			return list;
+		}
+
+		// === Other ====
+
 		base::Operation createStoreOperation(Iterator it) const {
-			const std::optional<size_t> variableOffset = offsetVariable(std::get<std::string>(it->value));
-			assume(variableOffset.has_value(), "Variable not declared", it);
-			return base::Operation(base::OpCode::STORE, variableOffset.value());
+			const std::string name = std::get<std::string>(it->value);
+
+			std::optional<size_t> variableOffset = offsetLocalVariable(name);
+			if (variableOffset.has_value()) {
+				return base::Operation(base::OpCode::STORE, variableOffset.value());
+			}
+
+			variableOffset = offsetGlobalVariable(name);
+			if (variableOffset.has_value()) {
+				return base::Operation(base::OpCode::STORE_GLOBAL, variableOffset.value());
+			}
+
+			throw ex::ParserException("used variable not declared", it->pos);
 		}
 
 		base::Operation createLoadOperation(Iterator it) const {
-			const std::optional<size_t> variableOffset = offsetVariable(std::get<std::string>(it->value));
-			assume(variableOffset.has_value(), "used variable not declared", it);
-			return base::Operation(base::OpCode::LOAD_VARIABLE, variableOffset.value());
+			const std::string name = std::get<std::string>(it->value);
+
+			std::optional<size_t> variableOffset = offsetLocalVariable(name);
+			if (variableOffset.has_value()) {
+				return base::Operation(base::OpCode::LOAD_VARIABLE, variableOffset.value());
+			}
+
+			variableOffset = offsetGlobalVariable(name);
+			if (variableOffset.has_value()) {
+				return base::Operation(base::OpCode::LOAD_GLOBAL, variableOffset.value());
+			}
+
+			throw ex::ParserException("used variable not declared", it->pos);
 		}
 
 	private:
 		std::vector<Breaker> breakers;
-		std::vector<Variable> variables;
-		size_t scopeLevel = 0;
+		EntityContainer<Variable> variables;
+		EntityContainer<Variable> globalVariables;
 
-		const std::vector<Variable>::const_iterator _getVariableIt(const std::string& name) const {
-			return std::find_if(variables.begin(), variables.end(), [&](const Variable& v) {
-				return v.name == name;
-			});
-		}
+		size_t scopeLevel = 0;
 
 		void assume(bool condition, const std::string& message, Iterator it) const {
 			if (!condition) {

@@ -12,10 +12,10 @@ using namespace std::string_literals;
 
 namespace variableTest {
 	TEST_CASE("Variable-Test") {
-
+		const std::string main = "\nfunc main() {}";
 		SECTION("Basic Tests") {
 			{
-				Compiler compiler("int value = 3;");
+				Compiler compiler("int value = 3;" + main);
 				REQUIRE(compiler.isSuccessful());
 
 				StackMachine machine(compiler.getProgram());
@@ -23,11 +23,11 @@ namespace variableTest {
 
 				machine.exec();
 				INFO(machine.toString());
-				REQUIRE(machine.getVariable(0).getInt() == 3);
+				REQUIRE(machine.getGlobalVariable(0).getInt() == 3);
 			}
 
 			{
-				Compiler compiler("uint value = 3u;");
+				Compiler compiler("uint value = 3u;" + main);
 				REQUIRE(compiler.isSuccessful());
 
 				StackMachine machine(compiler.getProgram());
@@ -35,11 +35,11 @@ namespace variableTest {
 
 				machine.exec();
 				INFO(machine.toString());
-				REQUIRE(machine.getVariable(0).getUint() == 3);
+				REQUIRE(machine.getGlobalVariable(0).getUint() == 3);
 			}
 
 			{
-				Compiler compiler("float value = 3.3;");
+				Compiler compiler("float value = 3.3;" + main);
 				REQUIRE(compiler.isSuccessful());
 
 				StackMachine machine(compiler.getProgram());
@@ -47,11 +47,11 @@ namespace variableTest {
 
 				machine.exec();
 				INFO(machine.toString());
-				REQUIRE(machine.getVariable(0).getFloat() == 3.3);
+				REQUIRE(machine.getGlobalVariable(0).getFloat() == 3.3);
 			}
 
 			{
-				Compiler compiler("bool value = true;");
+				Compiler compiler("bool value = true;" + main);
 				REQUIRE(compiler.isSuccessful());
 
 				StackMachine machine(compiler.getProgram());
@@ -59,7 +59,7 @@ namespace variableTest {
 
 				machine.exec();
 				INFO(machine.toString());
-				REQUIRE(machine.getVariable(0).getBool() == true);
+				REQUIRE(machine.getGlobalVariable(0).getBool() == true);
 			}
 
 			{
@@ -67,7 +67,8 @@ namespace variableTest {
 					"int a = 1;\n"
 					"uint b = 2u;\n"
 					"float c = 3.3;\n"
-					"bool d = false;\n";
+					"bool d = false;\n"
+					+ main;
 
 				Compiler compiler(std::move(code));
 				REQUIRE(compiler.isSuccessful());
@@ -78,18 +79,20 @@ namespace variableTest {
 				machine.exec();
 				INFO(machine.toString());
 
-				REQUIRE(machine.getVariable(0).getInt() == 1);
-				REQUIRE(machine.getVariable(1).getUint() == 2);
-				REQUIRE(machine.getVariable(2).getFloat() == 3.3);
-				REQUIRE(machine.getVariable(3).getBool() == false);
+				REQUIRE(machine.getGlobalVariable(0).getInt() == 1);
+				REQUIRE(machine.getGlobalVariable(1).getUint() == 2);
+				REQUIRE(machine.getGlobalVariable(2).getFloat() == 3.3);
+				REQUIRE(machine.getGlobalVariable(3).getBool() == false);
 			}
 		}
 
 		SECTION("Code") {
 			std::string code =
-				"int i = 1;"
-				"i = 2;"
-				"int j = i + 1;";
+				"int i = 1;\n"
+				"int j = i + 1;\n"
+				"func main() {\n"
+				"	i = i + 2;\n"
+				"}";
 
 			Compiler compiler(std::move(code));
 			REQUIRE(compiler.isSuccessful());
@@ -100,8 +103,8 @@ namespace variableTest {
 			machine.exec();
 			INFO(machine.toString());
 
-			REQUIRE(machine.getVariable(0).getInt() == 2);
-			REQUIRE(machine.getVariable(1).getInt() == 3);
+			REQUIRE(machine.getGlobalVariable(0).getInt() == 3);
+			REQUIRE(machine.getGlobalVariable(1).getInt() == 2);
 		}
 	}
 }

@@ -27,7 +27,7 @@ namespace compiler {
 
 			ShuntingYard shunting(tokens, source);
 			program = shunting.run();
-			assume(shunting.isSuccess(), "Errors during shunting yard");
+			assume(shunting.isSuccess(), "Errors during compilation");
 
 			//PostParser postParser(program);
 			//postParser.run();
