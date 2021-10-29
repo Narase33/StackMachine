@@ -37,7 +37,7 @@ namespace compiler {
 
 		void rewireJump(size_t from, size_t to) {
 			base::Operation& jump = bytecode[from];
-			assume(utils::any_of(jump.getOpCode(), { base::OpCode::JUMP, base::OpCode::JUMP_IF_NOT, base::OpCode::CALL_FUNCTION }), "expected to rewire jump", *(_current-1));
+			assume(utils::any_of(jump.getOpCode(), { base::OpCode::JUMP, base::OpCode::JUMP_IF_NOT, base::OpCode::CALL_FUNCTION }), "expected to rewire jump", *(_current - 1));
 			int32_t jumpDistance = to - from;
 			if (jumpDistance < 0) jumpDistance--;
 			jump.signedData() = jumpDistance;
@@ -212,8 +212,7 @@ namespace compiler {
 						break;
 					case base::OpCode::NAME:
 						if (functions.has(it->get<std::string>())) {
-							const int32_t jumpDistance = functions.offset(it->get<std::string>()).value() - index();
-							bytecode.push_back(base::Operation(base::OpCode::CALL_FUNCTION, jumpDistance));
+							insertJump(base::OpCode::CALL_FUNCTION, index(), functions.offset(it->get<std::string>()).value());
 						} else {
 							bytecode.push_back(scope.createLoadOperation(it));
 						}
@@ -252,7 +251,7 @@ namespace compiler {
 			bytecode.push_back(base::Operation(jump, 0)); // jump over block
 			const size_t jumpIndex = index();
 			compileStatement();
-			bytecode[jumpIndex].signedData() = index() - jumpIndex;
+			rewireJump(jumpIndex, index());
 			return jumpIndex;
 		}
 
@@ -266,7 +265,7 @@ namespace compiler {
 
 			if ((_current != _end) and (_current->opCode == base::OpCode::ELSE)) {
 				consume(base::OpCode::ELSE);
-				bytecode[jumpIndex].signedData()++;
+				rewireJump(jumpIndex, index() + 1);
 				insert_if_base<base::OpCode::JUMP>();
 			}
 		}
@@ -286,17 +285,17 @@ namespace compiler {
 			compileStatement(); // TODO Single statement need scope
 			const std::vector<ScopeDict::Breaker> breakers = scope.popLoop();
 
-			bytecode.push_back(base::Operation(base::OpCode::JUMP, static_cast<int32_t>(headIndex - index() - 1 /* "pc++" */)));
+			insertJump(base::OpCode::JUMP, index(), headIndex);
 			const size_t indexAfterLoop = index();
-			bytecode[jumpIndex].signedData() = indexAfterLoop - jumpIndex;
+			rewireJump(jumpIndex, indexAfterLoop);
 
 			for (const ScopeDict::Breaker& breaker : breakers) {
 				switch (breaker.it->opCode) {
 					case base::OpCode::CONTINUE:
-						bytecode[breaker.index].signedData() = headIndex - breaker.index /* "pc++" */;
+						rewireJump(breaker.index, headIndex+1); /* "pc++" */
 						break;
 					case base::OpCode::BREAK:
-						bytecode[breaker.index].signedData() = indexAfterLoop - breaker.index;
+						rewireJump(breaker.index, indexAfterLoop);
 						break;
 					default:
 						throw ex::ParserException("Unexpected breaker", breaker.it->pos);
@@ -346,10 +345,9 @@ namespace compiler {
 
 			std::vector<Function::Variable> parameters = extractFunctionParameters();
 
-
 			bytecode.push_back(base::Operation(base::OpCode::JUMP, 0));
 			const size_t jumpIndex = index();
-			
+
 			bool isNewFunction = functions.push(functionName.get<std::string>(), returnType, std::move(parameters), index());
 			assume(isNewFunction, "Function already known", *_current);
 
@@ -424,7 +422,7 @@ namespace compiler {
 						break;
 					case base::OpCode::FUNC:
 						parse_function();
-					break;
+						break;
 					case base::OpCode::CONTINUE: // fallthrough
 					case base::OpCode::BREAK:
 						registerBreaker();

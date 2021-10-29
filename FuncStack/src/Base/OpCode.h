@@ -29,9 +29,9 @@ namespace base {
 		// Interpreter
 		BEGIN_SCOPE, END_SCOPE, CALL_FUNCTION, END_FUNCTION,
 		END_PROGRAM,
-		LOAD_VARIABLE, LOAD_GLOBAL, STORE, STORE_GLOBAL,
+		LOAD_LOCAL, LOAD_GLOBAL, STORE_LOCAL, STORE_GLOBAL,
 		JUMP, JUMP_IF_NOT,
-		CREATE_VARIABLE, CREATE_GLOBAL, POP,
+		CREATE_VARIABLE, POP,
 		END_ENUM_OPCODE
 	};
 
@@ -95,7 +95,7 @@ namespace base {
 
 	inline int opCodeImpact(OpCode opCode) {
 		switch (opCode) {
-			case base::OpCode::LOAD_VARIABLE:
+			case base::OpCode::LOAD_LOCAL:
 			case base::OpCode::NAME:
 			case base::OpCode::LOAD_LITERAL: return 1;
 			case base::OpCode::JUMP:
@@ -113,7 +113,7 @@ namespace base {
 			case base::OpCode::SUB:
 			case base::OpCode::MULT:
 			case base::OpCode::DIV:
-			case base::OpCode::STORE: return -1;
+			case base::OpCode::STORE_LOCAL: return -1;
 		}
 		throw ex::Exception("Unknown opCode " + std::to_string(static_cast<size_t>(opCode)));
 	}
@@ -199,14 +199,13 @@ namespace base {
 
 			// Interpreter
 			SM_REGISTER_NAME(OpCode::END_PROGRAM);
-			SM_REGISTER_NAME(OpCode::LOAD_VARIABLE);
+			SM_REGISTER_NAME(OpCode::LOAD_LOCAL);
 			SM_REGISTER_NAME(OpCode::LOAD_GLOBAL);
-			SM_REGISTER_NAME(OpCode::STORE);
+			SM_REGISTER_NAME(OpCode::STORE_LOCAL);
 			SM_REGISTER_NAME(OpCode::STORE_GLOBAL);
 			SM_REGISTER_NAME(OpCode::JUMP);
 			SM_REGISTER_NAME(OpCode::JUMP_IF_NOT);
 			SM_REGISTER_NAME(OpCode::CREATE_VARIABLE);
-			SM_REGISTER_NAME(OpCode::CREATE_GLOBAL);
 			SM_REGISTER_NAME(OpCode::POP);
 		}
 		return "";

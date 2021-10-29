@@ -159,7 +159,7 @@ namespace compiler {
 
 			std::optional<size_t> variableOffset = offsetLocalVariable(name);
 			if (variableOffset.has_value()) {
-				return base::Operation(base::OpCode::STORE, variableOffset.value());
+				return base::Operation(base::OpCode::STORE_LOCAL, variableOffset.value());
 			}
 
 			variableOffset = offsetGlobalVariable(name);
@@ -175,7 +175,7 @@ namespace compiler {
 
 			std::optional<size_t> variableOffset = offsetLocalVariable(name);
 			if (variableOffset.has_value()) {
-				return base::Operation(base::OpCode::LOAD_VARIABLE, variableOffset.value());
+				return base::Operation(base::OpCode::LOAD_LOCAL, variableOffset.value());
 			}
 
 			variableOffset = offsetGlobalVariable(name);

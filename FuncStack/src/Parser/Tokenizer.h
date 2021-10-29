@@ -19,7 +19,7 @@ namespace compiler {
 	}
 
 	inline bool partOfVariableName(char c) {
-		return std::isalpha(c) or (c == '_');
+		return std::isalnum(c) or (c == '_');
 	};
 
 	class Extractor {

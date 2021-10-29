@@ -59,10 +59,10 @@ namespace stackmachine {
 					case base::OpCode::LOAD_LITERAL:
 						dataStack.push_back(program.getConstant(pc->unsignedData()));
 						break;
-					case base::OpCode::STORE:
+					case base::OpCode::STORE_LOCAL:
 						setVariable(pc->unsignedData(), dataStack.back());
 						break;
-					case base::OpCode::LOAD_VARIABLE:
+					case base::OpCode::LOAD_LOCAL:
 						dataStack.push_back(getVariable(pc->unsignedData()));
 						break;
 					case base::OpCode::CREATE_VARIABLE:
@@ -176,8 +176,8 @@ namespace stackmachine {
 						stream << value << " (" << program.constants[value].toString() << ")";
 						break;
 					case base::OpCode::END_SCOPE: // fallthrough
-					case base::OpCode::STORE: // fallthrough
-					case base::OpCode::LOAD_VARIABLE:
+					case base::OpCode::STORE_LOCAL: // fallthrough
+					case base::OpCode::LOAD_LOCAL:
 						stream << value;
 						break;
 				}

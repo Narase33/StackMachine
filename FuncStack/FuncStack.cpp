@@ -8,6 +8,7 @@
 #include "test/ParserTest.h"
 #include "test/VariableTest.h"
 #include "test/ControlFlowTest.h"
+#include "test/FunctionTest.h"
 
 #include "test/catch.hpp"
 
