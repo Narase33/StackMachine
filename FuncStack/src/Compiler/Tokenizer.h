@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "Token.h"
+#include "src/Base/Source.h"
 
 namespace compiler {
 	using Iterator = std::string::const_iterator;
@@ -169,7 +170,7 @@ namespace compiler {
 	};
 
 	class Tokenizer {
-		std::vector<Token> tokens;
+		std::optional<Token> peaked;
 		bool success = true;
 
 		Iterator current;
@@ -183,27 +184,17 @@ namespace compiler {
 			}
 		}
 
-		void runExtractors(std::initializer_list<Extractor*> extractors) {
+		Token runExtractors(std::initializer_list<Extractor*> extractors) {
 			for (Extractor* i : extractors) {
 				ExtractorResult result = i->extract();
 				if (result.has_value()) {
-					tokens.push_back(std::move(result.value()));
-					return;
+					return result.value();
 				}
 			}
 			throw ex::ParserException("Unknown token", std::distance(begin, current));
 		}
 
-	public:
-		Tokenizer(const base::Source& source) :
-			source(source), begin(source.begin()), current(source.begin()), end(source.end()) {
-		}
-
-		bool isSuccess() const {
-			return success;
-		}
-
-		std::vector<Token> run() {
+		Token extract() {
 			std::initializer_list<Extractor*> extractors = {
 				new Extractor_Operator(current, end),
 				new Extractor_NumberLiteral(current, end),
@@ -218,7 +209,7 @@ namespace compiler {
 				}
 
 				try {
-					runExtractors(extractors);
+					return runExtractors(extractors);
 				} catch (const ex::ParserException& ex) {
 					std::cout << ex.what() << "\n" << source.markedLineAt(ex.getPos()) << std::endl;
 					runToNextSync();
@@ -226,7 +217,33 @@ namespace compiler {
 				}
 			}
 
-			return std::move(tokens);
+			return Token(base::OpCode::END_PROGRAM, std::distance(begin, end));
+		}
+
+	public:
+		Tokenizer(const base::Source& source) :
+			source(source), begin(source.begin()), current(source.begin()), end(source.end()) {
+		}
+
+		bool isSuccess() const {
+			return success;
+		}
+
+		Token nextToken() {
+			if (!peaked.has_value()) {
+				return extract();
+			}
+
+			Token t = peaked.value();
+			peaked.reset();
+			return t;
+		}
+
+		const Token& peak() {
+			if (!peaked.has_value()) {
+				peaked = extract();
+			}
+			return peaked.value();
 		}
 	};
 }

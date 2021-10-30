@@ -44,4 +44,16 @@ namespace utils {
 	bool any_of(T t, std::initializer_list<T> list) {
 		return std::any_of(list.begin(), list.end(), [&](const T& e) {return e == t; });
 	}
+
+	template<typename T, typename T2>
+	constexpr bool anyOf(T t, T2 t2) {
+		static_assert(std::is_same<T, T2>::value);
+		return (t == t2);
+	}
+
+	template<typename T, typename T2, typename... T3>
+	constexpr bool anyOf(T t, T2 t2, T3... t3) {
+		static_assert(std::is_same<T, T2>::value);
+		return (t == t2) or anyOf(t, t3...);
+	}
 }

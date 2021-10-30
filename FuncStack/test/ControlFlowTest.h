@@ -2,7 +2,7 @@
 
 #include "catch.hpp"
 #include "../src/Stackmachine/Stackmachine.h"
-#include "../src/Parser/Parser.h"
+#include "../src/Compiler/Compiler.h"
 
 using namespace base;
 using namespace utils;
@@ -19,9 +19,9 @@ namespace controlFlowTest {
 				code += "}";
 
 				Compiler compiler(std::move(code));
-				REQUIRE(compiler.isSuccessful());
+				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.getProgram());
+				StackMachine machine(compiler.run());
 				INFO(machine.toString());
 
 				machine.exec();
@@ -47,9 +47,9 @@ namespace controlFlowTest {
 				code += "}";
 
 				Compiler compiler(std::move(code));
-				REQUIRE(compiler.isSuccessful());
+				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.getProgram());
+				StackMachine machine(compiler.run());
 				INFO(machine.toString());
 
 				machine.exec();
@@ -67,7 +67,9 @@ namespace controlFlowTest {
 
 	void test_compileFail(std::string&& expression) {
 		SECTION(expression) {
-			REQUIRE_THROWS(Compiler(std::move(expression)));
+			Compiler compiler(std::move(expression));
+			compiler.run();
+			REQUIRE(!compiler.isSuccess());
 		}
 	}
 

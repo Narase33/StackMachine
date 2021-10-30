@@ -12,7 +12,7 @@
 
 #include "test/catch.hpp"
 
-#include "src/Parser/Parser.h"
+#include "src/Compiler/Compiler.h"
 
 /* TODO
 	- String interning

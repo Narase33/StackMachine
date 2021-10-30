@@ -13,6 +13,9 @@ namespace base {
 		Source(const Source&) = delete;
 		Source& operator=(const Source&) = delete;
 
+		Source(Source&& other) = default;
+		Source& operator=(Source&& other) = default;
+
 		std::string::const_iterator begin() const {
 			return code.begin();
 		}
@@ -42,6 +45,6 @@ namespace base {
 		}
 
 	private:
-		const std::string code;
+		std::string code;
 	};
 }

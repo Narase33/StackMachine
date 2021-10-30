@@ -2,7 +2,7 @@
 
 #include "catch.hpp"
 #include "../src/Stackmachine/Stackmachine.h"
-#include "../src/Parser/Parser.h"
+#include "../src/Compiler/Compiler.h"
 
 using namespace base;
 using namespace utils;
@@ -16,9 +16,9 @@ namespace variableTest {
 		SECTION("Basic Tests") {
 			{
 				Compiler compiler("int value = 3;" + main);
-				REQUIRE(compiler.isSuccessful());
+				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.getProgram());
+				StackMachine machine(compiler.run());
 				INFO(machine.toString());
 
 				machine.exec();
@@ -28,9 +28,9 @@ namespace variableTest {
 
 			{
 				Compiler compiler("uint value = 3u;" + main);
-				REQUIRE(compiler.isSuccessful());
+				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.getProgram());
+				StackMachine machine(compiler.run());
 				INFO(machine.toString());
 
 				machine.exec();
@@ -40,9 +40,9 @@ namespace variableTest {
 
 			{
 				Compiler compiler("float value = 3.3;" + main);
-				REQUIRE(compiler.isSuccessful());
+				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.getProgram());
+				StackMachine machine(compiler.run());
 				INFO(machine.toString());
 
 				machine.exec();
@@ -52,9 +52,9 @@ namespace variableTest {
 
 			{
 				Compiler compiler("bool value = true;" + main);
-				REQUIRE(compiler.isSuccessful());
+				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.getProgram());
+				StackMachine machine(compiler.run());
 				INFO(machine.toString());
 
 				machine.exec();
@@ -71,9 +71,9 @@ namespace variableTest {
 					+ main;
 
 				Compiler compiler(std::move(code));
-				REQUIRE(compiler.isSuccessful());
+				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.getProgram());
+				StackMachine machine(compiler.run());
 				INFO(machine.toString());
 
 				machine.exec();
@@ -95,9 +95,9 @@ namespace variableTest {
 				"}";
 
 			Compiler compiler(std::move(code));
-			REQUIRE(compiler.isSuccessful());
+			REQUIRE(compiler.isSuccess());
 
-			StackMachine machine(compiler.getProgram());
+			StackMachine machine(compiler.run());
 			INFO(machine.toString());
 
 			machine.exec();

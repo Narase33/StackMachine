@@ -23,6 +23,10 @@ namespace compiler {
 			return std::get<T>(value);
 		}
 
+		bool isEnd() const {
+			return opCode == base::OpCode::END_PROGRAM;
+		}
+
 		base::OpCode opCode;
 		Type value;
 		size_t pos;

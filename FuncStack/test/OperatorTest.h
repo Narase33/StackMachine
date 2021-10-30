@@ -2,7 +2,7 @@
 
 #include "catch.hpp"
 #include "../src/Stackmachine/Stackmachine.h"
-#include "../src/Parser/Parser.h"
+#include "../src/Compiler/Compiler.h"
 
 using namespace utils;
 using namespace stackmachine;
@@ -18,9 +18,9 @@ namespace operatorTest {
 				code += "}";
 
 				Compiler compiler(std::move(code));
-				REQUIRE(compiler.isSuccessful());
+				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.getProgram());
+				StackMachine machine(compiler.run());
 				INFO(machine.toString());
 				machine.exec();
 

@@ -61,7 +61,7 @@ namespace compiler {
 	public:
 		struct Breaker {
 			size_t index, breakCount, level;
-			Iterator it;
+			Token token;
 		};
 
 		struct Variable {
@@ -88,8 +88,8 @@ namespace compiler {
 			scopeLevel--;
 		}
 
-		void pushBreaker(size_t index, size_t breakCount, Iterator it) {
-			breakers.push_back({ index, breakCount, scopeLevel, it });
+		void pushBreaker(size_t index, size_t breakCount, Token token) {
+			breakers.push_back({ index, breakCount, scopeLevel, token });
 		}
 
 		void pushLoop() {
@@ -144,18 +144,10 @@ namespace compiler {
 			return globalVariables.offset({ 0, variableName, 0 });
 		}
 
-		std::vector<base::Operation> globalStoreVariableList() const {
-			std::vector<base::Operation> list;
-			for (const Variable& v : globalVariables) {
-				list.push_back(base::Operation(base::OpCode::CREATE_VARIABLE, v.type));
-			}
-			return list;
-		}
-
 		// === Other ====
 
-		base::Operation createStoreOperation(Iterator it) const {
-			const std::string name = std::get<std::string>(it->value);
+		base::Operation createStoreOperation(const Token& token) const {
+			const std::string& name = std::get<std::string>(token.value);
 
 			std::optional<size_t> variableOffset = offsetLocalVariable(name);
 			if (variableOffset.has_value()) {
@@ -167,11 +159,11 @@ namespace compiler {
 				return base::Operation(base::OpCode::STORE_GLOBAL, variableOffset.value());
 			}
 
-			throw ex::ParserException("used variable not declared", it->pos);
+			throw ex::ParserException("used variable not declared", token.pos);
 		}
 
-		base::Operation createLoadOperation(Iterator it) const {
-			const std::string name = std::get<std::string>(it->value);
+		base::Operation createLoadOperation(const Token& token) const {
+			const std::string& name = std::get<std::string>(token.value);
 
 			std::optional<size_t> variableOffset = offsetLocalVariable(name);
 			if (variableOffset.has_value()) {
@@ -183,7 +175,7 @@ namespace compiler {
 				return base::Operation(base::OpCode::LOAD_GLOBAL, variableOffset.value());
 			}
 
-			throw ex::ParserException("used variable not declared", it->pos);
+			throw ex::ParserException("used variable not declared", token.pos);
 		}
 
 	private:
