@@ -44,6 +44,10 @@ namespace base {
 			return out;
 		}
 
+		const std::string& str() const {
+			return code;
+		}
+
 	private:
 		std::string code;
 	};

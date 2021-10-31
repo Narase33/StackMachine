@@ -50,27 +50,6 @@ namespace compiler {
 			bytecode.push_back(base::Operation(jump, jumpDistance));
 		}
 
-		template<typename... T>
-		void consume(std::string&& message, T&&... expectedOpCode) {
-			consume();
-			assume(!currentToken.isEnd() and utils::anyOf(currentToken.opCode, expectedOpCode...), message, currentToken);
-		}
-
-		template<typename... T>
-		void consume(const char* message, T&&... expectedOpCode) {
-			consume();
-			assume(!currentToken.isEnd() and utils::anyOf(currentToken.opCode, expectedOpCode...), message, currentToken);
-		}
-
-		template<typename... T>
-		void consume(T&&... expectedOpCode) {
-			consume("Unexpected token" + opCodeName(currentToken.opCode), expectedOpCode...);
-		}
-
-		void consume() {
-			currentToken = tokenizer.nextToken();
-		}
-
 		const Token& peak() {
 			return tokenizer.peak();
 		}
@@ -81,12 +60,9 @@ namespace compiler {
 			}
 		}
 
-		void runToNextSync() {
-			currentToken = tokenizer.nextToken();
-			while (!currentToken.isEnd() and (!utils::any_of(currentToken.opCode, { base::OpCode::BRACKET_ROUND_CLOSE, base::OpCode::BRACKET_CURLY_CLOSE, base::OpCode::END_FUNCTION }))) {
-				currentToken = tokenizer.nextToken();
-			}
-			consume();
+		void synchronize() {
+			tokenizer.synchronize();
+			currentToken = tokenizer.next();
 		}
 
 		int getCheckedPriority(const Token& token) const {
@@ -121,7 +97,7 @@ namespace compiler {
 				if (currentToken.opCode == bracketBegin) counter++;
 				else if (currentToken.opCode == bracketEnd) counter--;
 				else tokens.push_back(currentToken);
-				consume();
+				currentToken = tokenizer.next();
 			} while (counter > 0);
 			return tokens;
 		}
@@ -244,9 +220,9 @@ namespace compiler {
 			bytecode.push_back(base::Operation(base::OpCode::BEGIN_SCOPE));
 			scope.pushScope();
 			assert(currentToken.opCode == base::OpCode::BRACKET_CURLY_OPEN);
-			consume();
+			currentToken = tokenizer.next();
 
-			while (!utils::any_of(currentToken.opCode, { base::OpCode::END_PROGRAM, base::OpCode::BRACKET_CURLY_CLOSE })) {
+			while (utils::noneOf(currentToken.opCode, base::OpCode::END_PROGRAM, base::OpCode::BRACKET_CURLY_CLOSE)) {
 				compileStatement();
 			}
 
@@ -254,7 +230,7 @@ namespace compiler {
 			bytecode.push_back(base::Operation(base::OpCode::END_SCOPE, 1));
 
 			assert(currentToken.opCode == base::OpCode::BRACKET_CURLY_CLOSE);
-			consume();
+			currentToken = tokenizer.next();
 		}
 
 		void insertRoundBrackets() {
@@ -276,13 +252,13 @@ namespace compiler {
 		void parse_if() {
 			assert(currentToken.opCode == base::OpCode::IF);
 
-			consume("Missing round brackets after 'if'", base::OpCode::BRACKET_ROUND_OPEN);
+			currentToken = tokenizer.next("Missing round brackets after 'if'", base::OpCode::BRACKET_ROUND_OPEN);
 			insertRoundBrackets();
 
 			const size_t jumpIndex = insert_if_base<base::OpCode::JUMP_IF_NOT>();
 
 			if (!currentToken.isEnd() and (currentToken.opCode == base::OpCode::ELSE)) {
-				consume();
+				currentToken = tokenizer.next();
 				rewireJump(jumpIndex, index() + 1);
 				insert_if_base<base::OpCode::JUMP>();
 			}
@@ -294,7 +270,7 @@ namespace compiler {
 
 			const size_t headIndex = index();
 
-			consume("Missing round brackets after 'while'", base::OpCode::BRACKET_ROUND_OPEN);
+			currentToken = tokenizer.next("Missing round brackets after 'while'", base::OpCode::BRACKET_ROUND_OPEN);
 			insertRoundBrackets();
 
 			bytecode.push_back(base::Operation(base::OpCode::JUMP_IF_NOT, 0));
@@ -332,46 +308,46 @@ namespace compiler {
 			assert(currentToken.opCode == base::OpCode::TYPE);
 			const Token& paramType = currentToken;
 
-			consume(base::OpCode::NAME);
+			currentToken = tokenizer.next(base::OpCode::NAME);
 			const Token& paramName = currentToken;
 
-			consume(base::OpCode::COMMA, base::OpCode::BRACKET_ROUND_CLOSE);
+			currentToken = tokenizer.next(base::OpCode::COMMA, base::OpCode::BRACKET_ROUND_CLOSE);
 			return Function::Variable{ static_cast<base::TypeIndex>(paramType.get<size_t>()), paramName.get<std::string>() };
 		}
 
 		std::vector<Function::Variable> extractFunctionParameters() {
 			assert(currentToken.opCode == base::OpCode::BRACKET_ROUND_OPEN);
-			consume(base::OpCode::TYPE, base::OpCode::BRACKET_ROUND_CLOSE);
+			currentToken = tokenizer.next(base::OpCode::TYPE, base::OpCode::BRACKET_ROUND_CLOSE);
 
 			std::vector<Function::Variable> parameters;
 			if (currentToken.opCode == base::OpCode::TYPE) {
 				parameters.push_back(extractParameter());
 
 				while (currentToken.opCode == base::OpCode::COMMA) {
-					consume(base::OpCode::TYPE);
+					currentToken = tokenizer.next(base::OpCode::TYPE);
 					parameters.push_back(extractParameter());
 				}
 			}
 
 			assert(currentToken.opCode == base::OpCode::BRACKET_ROUND_CLOSE);
-			consume();
+			currentToken = tokenizer.next();
 			return parameters;
 		}
 
 		void parse_function() { // TODO optimize
 			assert(currentToken.opCode == base::OpCode::FUNC);
 			assume(scope.level() == 0, "Function declarations allowed only on global scope", currentToken); // TODO removed in future
-			consume(base::OpCode::TYPE, base::OpCode::NAME);
+			currentToken = tokenizer.next(base::OpCode::TYPE, base::OpCode::NAME);
 
 			std::optional<base::TypeIndex> returnType;
 			if (currentToken.opCode == base::OpCode::TYPE) {
 				returnType = static_cast<base::TypeIndex>(std::get<size_t>(currentToken.value));
-				consume("Expected function name after declaration", base::OpCode::NAME);
+				currentToken = tokenizer.next("Expected function name after declaration", base::OpCode::NAME);
 			}
 
 			const Token functionName = currentToken;
 
-			consume(base::OpCode::BRACKET_ROUND_OPEN);
+			currentToken = tokenizer.next(base::OpCode::BRACKET_ROUND_OPEN);
 			std::vector<Function::Variable> parameters = extractFunctionParameters();
 
 			bytecode.push_back(base::Operation(base::OpCode::JUMP, 0));
@@ -390,13 +366,13 @@ namespace compiler {
 			assert((currentToken.opCode == base::OpCode::CONTINUE) or (currentToken.opCode == base::OpCode::BREAK));
 			const Token breaker = currentToken;
 
-			consume();
+			currentToken = tokenizer.next();
 			if (currentToken.opCode != base::OpCode::END_STATEMENT) {
 				assume(currentToken.opCode == base::OpCode::LOAD_LITERAL, "expected literal after keyword", currentToken);
 				assume(std::holds_alternative<base::sm_int>(currentToken.value), "expected literal after keyword", currentToken);
 				levelsToJump = std::get<base::sm_int>(currentToken.value);
 				assume(levelsToJump > 0, "jump levels must be > 0", currentToken);
-				consume(base::OpCode::END_STATEMENT);
+				currentToken = tokenizer.next(base::OpCode::END_STATEMENT);
 			}
 
 			bytecode.push_back(base::Operation(base::OpCode::END_SCOPE, 0));
@@ -404,19 +380,19 @@ namespace compiler {
 			scope.pushBreaker(index(), levelsToJump, breaker);
 
 			assert(currentToken.opCode == base::OpCode::END_STATEMENT);
-			consume();
+			currentToken = tokenizer.next();
 		}
 
 		void embeddCodeStatement() {
 			std::vector<Token> tokens;
 			while (!currentToken.isEnd() and (currentToken.opCode != base::OpCode::END_STATEMENT)) {
 				tokens.push_back(currentToken);
-				consume();
+				currentToken = tokenizer.next();
 			}
 			assume(!currentToken.isEnd(), "Missing end statement!", currentToken);
 
 			shuntingYard(tokens);
-			consume();
+			currentToken = tokenizer.next();
 		}
 
 		void compileStatement() {
@@ -427,7 +403,7 @@ namespace compiler {
 						assert(std::holds_alternative<std::size_t>(currentToken.value));
 						size_t variableType = std::get<size_t>(currentToken.value);
 
-						consume("Missing variable name after type declaration", base::OpCode::NAME);
+						currentToken = tokenizer.next("Missing variable name after type declaration", base::OpCode::NAME);
 						std::string variableName = std::get<std::string>(currentToken.value);
 
 						const bool unknownVariable = scope.pushVariable(variableName, variableType);
@@ -439,7 +415,7 @@ namespace compiler {
 						if (peak().opCode == base::OpCode::ASSIGN) {
 							assert(std::holds_alternative<std::string>(currentToken.value));
 							base::Operation storeOperation = scope.createStoreOperation(currentToken);
-							consume(); consume();
+							currentToken = tokenizer.next(); currentToken = tokenizer.next();
 							embeddCodeStatement();
 							bytecode.push_back(std::move(storeOperation));
 						} else {
@@ -470,7 +446,7 @@ namespace compiler {
 				}
 			} catch (const ex::ParserException& ex) {
 				std::cout << ex.what() << "\n" << source.markedLineAt(ex.getPos()) << std::endl;
-				runToNextSync();
+				synchronize();
 				success = false;
 			}
 		}
@@ -481,7 +457,7 @@ namespace compiler {
 		}
 
 		Compiler(base::Source source)
-			: source(std::move(source)), tokenizer(this->source), currentToken(tokenizer.nextToken()) {
+			: source(std::move(source)), tokenizer(this->source.str()), currentToken(tokenizer.next()) {
 		}
 
 		base::Program run() {
@@ -498,7 +474,7 @@ namespace compiler {
 						}
 					} catch (const ex::ParserException& ex) {
 						std::cout << ex.what() << "\n" << source.markedLineAt(ex.getPos()) << std::endl;
-						runToNextSync();
+						synchronize();
 						success = false;
 					}
 				}
@@ -511,7 +487,7 @@ namespace compiler {
 				}
 			} catch (const ex::ParserException& ex) {
 				std::cout << ex.what() << "\n" << source.markedLineAt(ex.getPos()) << std::endl;
-				runToNextSync();
+				synchronize();
 				success = false;
 			}
 

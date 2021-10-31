@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/Exception.h"
+#include "StringView.h"
 
 namespace base {
 	enum class OpCode : uint8_t {
@@ -35,7 +36,7 @@ namespace base {
 		END_ENUM_OPCODE
 	};
 
-	inline OpCode opCodeFromKeyword(const std::string_view keyword) {
+	inline OpCode opCodeFromKeyword(StringView keyword) {
 		if (keyword == "if") return OpCode::IF;
 		if (keyword == "else") return OpCode::ELSE;
 		if (keyword == "while") return OpCode::WHILE;
@@ -45,9 +46,9 @@ namespace base {
 		return OpCode::ERR;
 	}
 
-	inline OpCode opCodeFromSymbol(const std::string_view symbol) {
+	inline OpCode opCodeFromSymbol(StringView symbol) {
 		if (symbol.length() == 1) {
-			switch (symbol[0]) {
+			switch (*symbol) {
 				case '(': return OpCode::BRACKET_ROUND_OPEN;
 				case ')': return OpCode::BRACKET_ROUND_CLOSE;
 				case '{': return OpCode::BRACKET_CURLY_OPEN;
@@ -211,4 +212,61 @@ namespace base {
 		return "";
 	}
 #undef SM_REGISTER_NAME
+
+	template <typename T, typename... T2>
+	std::string opCodeName(T opCode1, T2... opCodeRest) {
+		static_assert(std::is_same<T, base::OpCode>::value);
+
+		std::string out = opCodeName(opCode1);
+		((out += ", " + opCodeName(opCodeRest)), ...);
+		return out;
+	}
+
+#define SM_REGISTER_NAME(x, y) case x: return y
+	inline std::string opCodeNameUser(OpCode opCode) {
+		switch (opCode) {
+			// Lexer
+			SM_REGISTER_NAME(OpCode::TYPE, "type");
+			SM_REGISTER_NAME(OpCode::END_STATEMENT, ";");
+			SM_REGISTER_NAME(OpCode::COMMA, ",");
+			SM_REGISTER_NAME(OpCode::IF, "<if>");
+			SM_REGISTER_NAME(OpCode::ELSE, "<else>");
+			SM_REGISTER_NAME(OpCode::WHILE, "<while>");
+			SM_REGISTER_NAME(OpCode::CONTINUE, "<continue>");
+			SM_REGISTER_NAME(OpCode::BREAK, "<break>");
+			SM_REGISTER_NAME(OpCode::BRACKET_ROUND_OPEN, "(");
+			SM_REGISTER_NAME(OpCode::BRACKET_ROUND_CLOSE, ")");
+			SM_REGISTER_NAME(OpCode::BRACKET_SQUARE_OPEN, "[");
+			SM_REGISTER_NAME(OpCode::BRACKET_SQUARE_CLOSE, "]");
+			SM_REGISTER_NAME(OpCode::BRACKET_CURLY_OPEN, "{");
+			SM_REGISTER_NAME(OpCode::BRACKET_CURLY_CLOSE, "}");
+			SM_REGISTER_NAME(OpCode::NAME, "name");
+			SM_REGISTER_NAME(OpCode::FUNC, "<func>");
+
+			// Lexer + Interpreter
+			SM_REGISTER_NAME(OpCode::LOAD_LITERAL, "literal");
+			SM_REGISTER_NAME(OpCode::EQ, "==");
+			SM_REGISTER_NAME(OpCode::UNEQ, "!=");
+			SM_REGISTER_NAME(OpCode::BIGGER, ">");
+			SM_REGISTER_NAME(OpCode::LESS, "<");
+			SM_REGISTER_NAME(OpCode::ADD, "+");
+			SM_REGISTER_NAME(OpCode::SUB, "-");
+			SM_REGISTER_NAME(OpCode::MULT, "*");
+			SM_REGISTER_NAME(OpCode::DIV, "/");
+			SM_REGISTER_NAME(OpCode::INCR, "++");
+			SM_REGISTER_NAME(OpCode::DECR, "--");
+			SM_REGISTER_NAME(OpCode::ASSIGN, "=");
+		}
+		return "<error>";
+	}
+#undef SM_REGISTER_NAME
+
+	template <typename T, typename... T2>
+	std::string opCodeNameUser(T opCode1, T2... opCodeRest) {
+		static_assert(std::is_same<T, base::OpCode>::value);
+
+		std::string out = opCodeNameUser(opCode1);
+		((out += ", " + opCodeNameUser(opCodeRest)), ...);
+		return out;
+	}
 }

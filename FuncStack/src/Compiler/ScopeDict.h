@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+#include <optional>
 #include "Token.h"
 
 namespace compiler {
