@@ -4,7 +4,6 @@
 #include "../src/Stackmachine/Stackmachine.h"
 #include "../src/Compiler/Compiler.h"
 
-using namespace utils;
 using namespace stackmachine;
 using namespace compiler;
 

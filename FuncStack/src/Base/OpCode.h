@@ -1,7 +1,7 @@
 #pragma once
 
 #include "src/Exception.h"
-#include "StringView.h"
+#include "src/Utils/StringWindow.h"
 
 namespace base {
 	enum class OpCode : uint8_t {
@@ -36,7 +36,7 @@ namespace base {
 		END_ENUM_OPCODE
 	};
 
-	inline OpCode opCodeFromKeyword(StringView keyword) {
+	inline OpCode opCodeFromKeyword(const StringWindow& keyword) {
 		if (keyword == "if") return OpCode::IF;
 		if (keyword == "else") return OpCode::ELSE;
 		if (keyword == "while") return OpCode::WHILE;
@@ -46,7 +46,7 @@ namespace base {
 		return OpCode::ERR;
 	}
 
-	inline OpCode opCodeFromSymbol(StringView symbol) {
+	inline OpCode opCodeFromSymbol(StringWindow symbol) {
 		if (symbol.length() == 1) {
 			switch (*symbol) {
 				case '(': return OpCode::BRACKET_ROUND_OPEN;

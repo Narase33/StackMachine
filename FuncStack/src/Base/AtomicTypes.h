@@ -1,6 +1,10 @@
 #pragma once
 
-#include <string_view>
+#include <unordered_map>
+#include <tuple>
+#include <initializer_list>
+
+#include "src/Utils/StringWindow.h"
 
 namespace base {
 	using sm_int = int64_t;
@@ -25,7 +29,7 @@ namespace base {
 	}
 #undef SM_REGISTER_NAME
 
-	TypeIndex stringToId(std::string_view str) {
+	TypeIndex stringToId(const StringWindow& str) {
 		if (str == "int") return TypeIndex::Int;
 		if (str == "uint") return TypeIndex::Uint;
 		if (str == "float") return TypeIndex::Float;

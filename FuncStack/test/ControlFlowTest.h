@@ -5,7 +5,6 @@
 #include "../src/Compiler/Compiler.h"
 
 using namespace base;
-using namespace utils;
 using namespace stackmachine;
 using namespace compiler;
 

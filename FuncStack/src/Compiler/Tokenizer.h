@@ -7,7 +7,7 @@
 #include <sstream>
 
 #include "Token.h"
-#include "src/Base/Source.h"
+#include "src/Utils/Source.h"
 
 namespace compiler {
 	using ExtractorResult = std::optional<Token>;
@@ -20,7 +20,7 @@ namespace compiler {
 		std::optional<Token> peaked;
 		bool success = true;
 
-		base::StringView view;
+		StringWindow view;
 
 		void skipWhitespace() {
 			while (!view.isEnd() and std::isspace(*view)) {
@@ -28,89 +28,98 @@ namespace compiler {
 			}
 		}
 
-		std::string extractLexem(std::function<bool(char)> recognizer) {
-			std::string currentToken;
-			while (!view.isEnd() && recognizer(*view)) {
-				currentToken += *view;
-				view.removePrefix(1);
+		using Recognizer = bool(*)(char);
+		StringWindow extractLexem(Recognizer recognizer) {
+			int i = 0;
+			for (; i < view.length(); i++) {
+				if (!recognizer(view[i])) {
+					break;
+				}
 			}
-			return currentToken;
+			return view.subStr(i);
 		}
 
-		std::string extractNumber() {
-			std::string currentToken;
-
-			while (!view.isEnd() and std::isdigit(*view)) {
-				currentToken += *view;
-				view.removePrefix(1);
-			}
-
-			return currentToken;
+		StringWindow extractNumber() {
+			return extractLexem([](char c) -> bool {
+				return std::isdigit(c);
+			});
 		}
 
-		ExtractorResult extractName() {
-			const size_t save = view.pos();
-
-			if (!view.isEnd() and partOfVariableName(*view)) {
-				const std::string lexem = extractLexem(partOfVariableName);
-
-				if ((lexem == "true") or (lexem == "false")) {
-					return Token(base::OpCode::LOAD_LITERAL, lexem == "true", view.pos()); // Literal Bool
-				}
-
-				const base::OpCode symbol = base::opCodeFromKeyword(lexem);
-				if (symbol != base::OpCode::ERR) {
-					return Token(symbol, view.pos()); // Type Keyword
-				}
-
-				const base::TypeIndex variableTypeId = base::stringToId(lexem);
-				if (variableTypeId != base::TypeIndex::Err) {
-					return Token(base::OpCode::TYPE, static_cast<size_t>(variableTypeId), view.pos());
-				}
-
-				return Token(base::OpCode::NAME, lexem, view.pos()); // Name
+		ExtractorResult extractType(const StringWindow& nameLexem) {
+			const base::TypeIndex variableTypeId = base::stringToId(nameLexem);
+			if (variableTypeId != base::TypeIndex::Err) {
+				return Token(base::OpCode::TYPE, static_cast<size_t>(variableTypeId), view.pos()); // Type
 			}
+			return {};
+		}
 
-			view.toPos(save);
+		ExtractorResult extractKeyword(const StringWindow& nameLexem) {
+			const base::OpCode symbol = base::opCodeFromKeyword(nameLexem);
+			if (symbol != base::OpCode::ERR) {
+				return Token(symbol, view.pos()); // Keyword
+			}
+			return {};
+		}
+
+		ExtractorResult extractName(const StringWindow& nameLexem) {
+			if (nameLexem.length() > 0) {
+				return Token(base::OpCode::NAME, nameLexem.str(), view.pos()); // Name
+			}
 			return {};
 		}
 
 		ExtractorResult extractLiteral() {
-			size_t save = view.pos();
+			const size_t pos = view.pos();
+			if (view.isEnd()) {
+				return {};
+			}
 
-			if (!view.isEnd() and std::isdigit(*view)) {
-				const std::string beforeDot = extractNumber();
+			if (view.startsWith("true")) {
+				view.removePrefix(4);
+				return Token(base::OpCode::LOAD_LITERAL, true, pos); // Literal Bool
+			}
+
+			if (view.startsWith("false")) {
+				view.removePrefix(5);
+				return Token(base::OpCode::LOAD_LITERAL, false, pos); // Literal Bool
+			}
+
+			if (std::isdigit(*view)) {
+				StringWindow number = extractNumber(); // TODO Better
+				view.removePrefix(number.length());
 
 				if (!view.isEnd() and (*view == '.')) {
-					save = view.pos();
+					number.addSuffix(1);
 					view.removePrefix(1);
 
 					if (!view.isEnd() and std::isdigit(*view)) {
-						const std::string afterDot = extractNumber();
+						const StringWindow digitsAfterDot = extractNumber();
+						number.addSuffix(digitsAfterDot.length());
+						view.removePrefix(digitsAfterDot.length());
+
 						if (!std::isalpha(*view)) {
-							return Token(base::OpCode::LOAD_LITERAL, std::stod(beforeDot + "." + afterDot), view.pos()); // Literal Double
+							return Token(base::OpCode::LOAD_LITERAL, std::stod(number.str()), pos); // Literal Double
 						}
 					}
-					view.toPos(save);
+
+					return {};
 				}
 
 				if (!view.isEnd() and (*view == 'u')) {
 					view.removePrefix(1);
-					return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_uint>(std::stoul(beforeDot)), view.pos()); // Literal Long
+					return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_uint>(std::stoul(number.str())), pos); // Literal Long
 				}
-				return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_int>(std::stol(beforeDot)), view.pos()); // Literal Long
+
+				return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_int>(std::stol(number.str())), pos); // Literal Long
 			}
 
-			view.toPos(save);
 			return {};
 		}
 
 		ExtractorResult extractOperator() {
-			const size_t save = view.pos();
-
 			if (!view.isEnd()) {
 				if (view.length() > 1) {
-					const base::StringView op = view.subStr(2);
+					const StringWindow op = view.subStr(2);
 					const base::OpCode symbol = base::opCodeFromSymbol(op);
 					if (symbol != base::OpCode::ERR) {
 						view.removePrefix(2);
@@ -118,7 +127,7 @@ namespace compiler {
 					}
 				}
 
-				const base::StringView op = view.subStr(1);
+				const StringWindow op = view.subStr(1);
 				const base::OpCode symbol = base::opCodeFromSymbol(op);
 				if (symbol != base::OpCode::ERR) {
 					view.removePrefix(1);
@@ -126,7 +135,6 @@ namespace compiler {
 				}
 			}
 
-			view.toPos(save);
 			return {};
 		}
 
@@ -146,12 +154,26 @@ namespace compiler {
 				return result.value();
 			}
 
-			result = extractName();
+			result = extractOperator();
 			if (result.has_value()) {
 				return result.value();
 			}
 
-			result = extractOperator();
+			// name lexems ->
+			const StringWindow nameLexem = extractLexem(partOfVariableName);
+			view.removePrefix(nameLexem.length());
+
+			result = extractKeyword(nameLexem);
+			if (result.has_value()) {
+				return result.value();
+			}
+
+			result = extractType(nameLexem);
+			if (result.has_value()) {
+				return result.value();
+			}
+
+			result = extractName(nameLexem);
 			if (result.has_value()) {
 				return result.value();
 			}
@@ -200,10 +222,14 @@ namespace compiler {
 				case base::OpCode::WHILE:
 				case base::OpCode::CONTINUE:
 				case base::OpCode::BREAK:
-				case base::OpCode::TYPE:
-				case base::OpCode::NAME:
 				case base::OpCode::FUNC:
-					result = extractName();
+					result = extractKeyword(extractLexem(partOfVariableName));
+					break;
+				case base::OpCode::TYPE:
+					result = extractType(extractLexem(partOfVariableName));
+					break;
+				case base::OpCode::NAME:
+					result = extractName(extractLexem(partOfVariableName));
 					break;
 				case base::OpCode::LOAD_LITERAL:
 					result = extractLiteral();
@@ -255,7 +281,7 @@ namespace compiler {
 		}
 
 		void synchronize() {
-			while (!view.isEnd() and utils::noneOf(*view, ';', ')', '}', ']')) {
+			while (!view.isEnd() and noneOf(*view, ';', ')', '}', ']')) {
 				view.removePrefix(1);
 			}
 		}
@@ -282,14 +308,14 @@ namespace compiler {
 		template<typename... T>
 		Token next(std::string&& message, T&&... expectedOpCode) {
 			Token token = next();
-			assume(!token.isEnd() and utils::anyOf(token.opCode, expectedOpCode...), message, token);
+			assume(!token.isEnd() and anyOf(token.opCode, expectedOpCode...), message, token);
 			return token;
 		}
 
 		template<typename... T>
 		Token next(const char* message, T&&... expectedOpCode) {
 			Token token = next();
-			assume(!token.isEnd() and utils::anyOf(token.opCode, expectedOpCode...), message, token);
+			assume(!token.isEnd() and anyOf(token.opCode, expectedOpCode...), message, token);
 			return token;
 		}
 

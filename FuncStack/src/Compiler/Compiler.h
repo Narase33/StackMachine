@@ -11,12 +11,12 @@
 #include "Function.h"
 #include "Tokenizer.h"
 
-#include "src/Base/Source.h"
+#include "src/Utils/Source.h"
 #include "src/Base/Program.h"
 
 namespace compiler {
 	class Compiler {
-		base::Source source;
+		Source source;
 
 		Tokenizer tokenizer;
 
@@ -37,14 +37,14 @@ namespace compiler {
 
 		void rewireJump(size_t from, size_t to) {
 			base::Operation& jump = bytecode[from];
-			assume(utils::anyOf(jump.getOpCode(), base::OpCode::JUMP, base::OpCode::JUMP_IF_NOT, base::OpCode::CALL_FUNCTION), "expected to rewire jump", currentToken);
+			assume(anyOf(jump.getOpCode(), base::OpCode::JUMP, base::OpCode::JUMP_IF_NOT, base::OpCode::CALL_FUNCTION), "expected to rewire jump", currentToken);
 			int32_t jumpDistance = to - from;
 			if (jumpDistance < 0) jumpDistance--;
 			jump.signedData() = jumpDistance;
 		}
 
 		void insertJump(base::OpCode jump, size_t from, size_t to) {
-			assume(utils::anyOf(jump, base::OpCode::JUMP, base::OpCode::JUMP_IF_NOT, base::OpCode::CALL_FUNCTION), "expected to rewire jump", currentToken);
+			assume(anyOf(jump, base::OpCode::JUMP, base::OpCode::JUMP_IF_NOT, base::OpCode::CALL_FUNCTION), "expected to rewire jump", currentToken);
 			int32_t jumpDistance = to - from;
 			if (jumpDistance < 0) jumpDistance--;
 			bytecode.push_back(base::Operation(jump, jumpDistance));
@@ -85,7 +85,7 @@ namespace compiler {
 		}
 
 		std::vector<Token> unwindGroup() {
-			assert(utils::anyOf(currentToken.opCode, base::OpCode::BRACKET_ROUND_OPEN, base::OpCode::BRACKET_CURLY_OPEN, base::OpCode::BRACKET_SQUARE_OPEN));
+			assert(anyOf(currentToken.opCode, base::OpCode::BRACKET_ROUND_OPEN, base::OpCode::BRACKET_CURLY_OPEN, base::OpCode::BRACKET_SQUARE_OPEN));
 			auto [bracketBegin, bracketEnd] = base::getBracketGroup(currentToken.opCode);
 
 			std::vector<Token> tokens;
@@ -222,7 +222,7 @@ namespace compiler {
 			assert(currentToken.opCode == base::OpCode::BRACKET_CURLY_OPEN);
 			currentToken = tokenizer.next();
 
-			while (utils::noneOf(currentToken.opCode, base::OpCode::END_PROGRAM, base::OpCode::BRACKET_CURLY_CLOSE)) {
+			while (noneOf(currentToken.opCode, base::OpCode::END_PROGRAM, base::OpCode::BRACKET_CURLY_CLOSE)) {
 				compileStatement();
 			}
 
@@ -240,7 +240,7 @@ namespace compiler {
 
 		template<base::OpCode jump>
 		size_t insert_if_base() {
-			static_assert(utils::anyOf(jump, base::OpCode::JUMP, base::OpCode::JUMP_IF_NOT));
+			static_assert(anyOf(jump, base::OpCode::JUMP, base::OpCode::JUMP_IF_NOT));
 
 			bytecode.push_back(base::Operation(jump, 0)); // jump over block
 			const size_t jumpIndex = index();
@@ -450,13 +450,13 @@ namespace compiler {
 				success = false;
 			}
 		}
-
+		
 	public:
 		bool isSuccess() const {
 			return success and tokenizer.isSuccess();
 		}
 
-		Compiler(base::Source source)
+		Compiler(Source source)
 			: source(std::move(source)), tokenizer(this->source.str()), currentToken(tokenizer.next()) {
 		}
 
