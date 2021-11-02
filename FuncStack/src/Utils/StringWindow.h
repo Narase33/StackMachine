@@ -3,6 +3,8 @@
 #include <string>
 #include <assert.h>
 
+#include "cString.h"
+
 class StringWindow {
 public:
 	StringWindow(const char* str, size_t length)
@@ -13,8 +15,8 @@ public:
 		: StringWindow(str.c_str(), str.length()) {
 	}
 
-	StringWindow(const char* str)
-		: StringWindow(str, std::strlen(str)) {
+	StringWindow(cString str)
+		: StringWindow(str.str, str.length) {
 	}
 
 	void removePrefix(size_t length) {
@@ -43,12 +45,11 @@ public:
 		return copy;
 	}
 
-	template<size_t length>
-	constexpr size_t startsWith(char const (&str)[length]) const {
-		if (length > this->length()) {
+	constexpr size_t startsWith(cString str) const {
+		if (str.length > this->length()) {
 			return false;
 		}
-		return std::memcmp(window_begin, str, length - 1) == 0;
+		return std::memcmp(window_begin, str.str, str.length) == 0;
 	}
 
 	char operator*() const {
@@ -67,7 +68,7 @@ public:
 		return window_begin - str_begin;
 	}
 
-	size_t length() const {
+	constexpr size_t length() const {
 		return window_end - window_begin;
 	}
 
@@ -85,10 +86,9 @@ private:
 	const char* str_end;
 };
 
-template<size_t length>
-inline bool operator==(StringWindow left, char const (&right)[length]) {
-	if (left.length() != (length - 1)) {
+inline bool operator==(StringWindow left, cString right) {
+	if (left.length() != (right.length)) {
 		return false;
 	}
-	return std::memcmp(left.c_str(), right, length - 1) == 0;
+	return std::memcmp(left.c_str(), right.str, right.length) == 0;
 }

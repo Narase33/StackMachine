@@ -156,7 +156,7 @@ namespace base {
 	}
 
 #define SM_REGISTER_NAME(x) case x: return #x
-	inline std::string opCodeName(OpCode opCode) {
+	inline cString opCodeName(OpCode opCode) {
 		switch (opCode) {
 			// Global
 			SM_REGISTER_NAME(OpCode::NOOP);
@@ -217,34 +217,35 @@ namespace base {
 	std::string opCodeName(T opCode1, T2... opCodeRest) {
 		static_assert(std::is_same<T, base::OpCode>::value);
 
-		std::string out = opCodeName(opCode1);
-		((out += ", " + opCodeName(opCodeRest)), ...);
-		return out;
+		std::ostringstream out;
+		out << opCodeName(opCode1);
+		((out << ", " << opCodeName(opCodeRest)), ...);
+		return out.str;
 	}
 
 #define SM_REGISTER_NAME(x, y) case x: return y
-	inline std::string opCodeNameUser(OpCode opCode) {
+	inline cString opCodeNameUser(OpCode opCode) {
 		switch (opCode) {
 			// Lexer
-			SM_REGISTER_NAME(OpCode::TYPE, "type");
+			SM_REGISTER_NAME(OpCode::TYPE, "<type>");
 			SM_REGISTER_NAME(OpCode::END_STATEMENT, ";");
 			SM_REGISTER_NAME(OpCode::COMMA, ",");
-			SM_REGISTER_NAME(OpCode::IF, "<if>");
-			SM_REGISTER_NAME(OpCode::ELSE, "<else>");
-			SM_REGISTER_NAME(OpCode::WHILE, "<while>");
-			SM_REGISTER_NAME(OpCode::CONTINUE, "<continue>");
-			SM_REGISTER_NAME(OpCode::BREAK, "<break>");
+			SM_REGISTER_NAME(OpCode::IF, "if");
+			SM_REGISTER_NAME(OpCode::ELSE, "else");
+			SM_REGISTER_NAME(OpCode::WHILE, "while");
+			SM_REGISTER_NAME(OpCode::CONTINUE, "continue");
+			SM_REGISTER_NAME(OpCode::BREAK, "break");
 			SM_REGISTER_NAME(OpCode::BRACKET_ROUND_OPEN, "(");
 			SM_REGISTER_NAME(OpCode::BRACKET_ROUND_CLOSE, ")");
 			SM_REGISTER_NAME(OpCode::BRACKET_SQUARE_OPEN, "[");
 			SM_REGISTER_NAME(OpCode::BRACKET_SQUARE_CLOSE, "]");
 			SM_REGISTER_NAME(OpCode::BRACKET_CURLY_OPEN, "{");
 			SM_REGISTER_NAME(OpCode::BRACKET_CURLY_CLOSE, "}");
-			SM_REGISTER_NAME(OpCode::NAME, "name");
-			SM_REGISTER_NAME(OpCode::FUNC, "<func>");
+			SM_REGISTER_NAME(OpCode::NAME, "<name>");
+			SM_REGISTER_NAME(OpCode::FUNC, "func");
 
 			// Lexer + Interpreter
-			SM_REGISTER_NAME(OpCode::LOAD_LITERAL, "literal");
+			SM_REGISTER_NAME(OpCode::LOAD_LITERAL, "<literal>");
 			SM_REGISTER_NAME(OpCode::EQ, "==");
 			SM_REGISTER_NAME(OpCode::UNEQ, "!=");
 			SM_REGISTER_NAME(OpCode::BIGGER, ">");
@@ -265,8 +266,9 @@ namespace base {
 	std::string opCodeNameUser(T opCode1, T2... opCodeRest) {
 		static_assert(std::is_same<T, base::OpCode>::value);
 
-		std::string out = opCodeNameUser(opCode1);
-		((out += ", " + opCodeNameUser(opCodeRest)), ...);
-		return out;
+		std::ostringstream out;
+		out << opCodeNameUser(opCode1);
+		((out << ", " << opCodeNameUser(opCodeRest)), ...);
+		return out.str();
 	}
 }

@@ -60,7 +60,9 @@ namespace compiler {
 			}
 		}
 
-		void synchronize() {
+		void synchronize(const ex::ParserException& ex) {
+			std::cout << ex.what() << "\n" << source.markedLineAt(ex.getPos()) << std::endl;
+			success = false;
 			tokenizer.synchronize();
 			currentToken = tokenizer.next();
 		}
@@ -445,15 +447,13 @@ namespace compiler {
 						throw ex::ParserException("Unknown token", currentToken.pos);
 				}
 			} catch (const ex::ParserException& ex) {
-				std::cout << ex.what() << "\n" << source.markedLineAt(ex.getPos()) << std::endl;
-				synchronize();
-				success = false;
+				synchronize(ex);
 			}
 		}
 		
 	public:
 		bool isSuccess() const {
-			return success and tokenizer.isSuccess();
+			return success;
 		}
 
 		Compiler(Source source)
@@ -473,9 +473,7 @@ namespace compiler {
 								throw ex::ParserException("Only declarations allowed on global scope", currentToken.pos);
 						}
 					} catch (const ex::ParserException& ex) {
-						std::cout << ex.what() << "\n" << source.markedLineAt(ex.getPos()) << std::endl;
-						synchronize();
-						success = false;
+						synchronize(ex);
 					}
 				}
 
@@ -486,9 +484,7 @@ namespace compiler {
 					bytecode.push_back(base::Operation(base::OpCode::END_PROGRAM));
 				}
 			} catch (const ex::ParserException& ex) {
-				std::cout << ex.what() << "\n" << source.markedLineAt(ex.getPos()) << std::endl;
-				synchronize();
-				success = false;
+				synchronize(ex);
 			}
 
 			return std::move(program);

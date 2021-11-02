@@ -18,7 +18,6 @@ namespace compiler {
 
 	class Tokenizer {
 		std::optional<Token> peaked;
-		bool success = true;
 
 		StringWindow view;
 
@@ -117,34 +116,46 @@ namespace compiler {
 		}
 
 		ExtractorResult extractOperator() {
-			if (!view.isEnd()) {
-				if (view.length() > 1) {
-					const StringWindow op = view.subStr(2);
-					const base::OpCode symbol = base::opCodeFromSymbol(op);
-					if (symbol != base::OpCode::ERR) {
-						view.removePrefix(2);
-						return Token(symbol, view.pos());
-					}
-				}
+			if (view.isEnd()) {
+				return {};
+			}
 
-				const StringWindow op = view.subStr(1);
+			if (view.length() > 1) {
+				const StringWindow op = view.subStr(2);
 				const base::OpCode symbol = base::opCodeFromSymbol(op);
 				if (symbol != base::OpCode::ERR) {
-					view.removePrefix(1);
+					view.removePrefix(2);
 					return Token(symbol, view.pos());
 				}
+			}
+
+			const StringWindow op = view.subStr(1);
+			const base::OpCode symbol = base::opCodeFromSymbol(op);
+			if (symbol != base::OpCode::ERR) {
+				view.removePrefix(1);
+				return Token(symbol, view.pos());
+			}
+
+			return {};
+		}
+
+		ExtractorResult extractOperator(base::OpCode hint) {
+			if (view.isEnd()) {
+				return {};
+			}
+
+			const size_t pos = view.pos();
+			const cString opName = opCodeNameUser(hint);
+			if (view.startsWith(opName)) {
+				view.removePrefix(opName.length);
+				return Token(hint, pos);
 			}
 
 			return {};
 		}
 
 		Token extract() {
-			if (view.isEnd()) {
-				return Token(base::OpCode::END_PROGRAM, view.pos());
-			}
-
 			skipWhitespace();
-
 			if (view.isEnd()) {
 				return Token(base::OpCode::END_PROGRAM, view.pos());
 			}
@@ -178,17 +189,10 @@ namespace compiler {
 				return result.value();
 			}
 
-			success = false;
-			const size_t errorPos = view.pos();
-			view.removePrefix(1);
-			throw ex::ParserException("Could not recognize token", errorPos);
+			throw ex::ParserException("Could not recognize token", view.pos());
 		}
 
 		Token extract(std::string&& message, base::OpCode hint) {
-			if (view.isEnd()) {
-				return Token(base::OpCode::END_PROGRAM, view.pos());
-			}
-
 			skipWhitespace();
 			if (view.isEnd()) {
 				return Token(base::OpCode::END_PROGRAM, view.pos());
@@ -215,7 +219,7 @@ namespace compiler {
 				case base::OpCode::INCR:
 				case base::OpCode::DECR:
 				case base::OpCode::ASSIGN:
-					result = extractOperator();
+					result = extractOperator(hint);
 					break;
 				case base::OpCode::IF:
 				case base::OpCode::ELSE:
@@ -237,10 +241,7 @@ namespace compiler {
 			}
 
 			if (!result.has_value()) {
-				success = false;
-				const size_t errorPos = view.pos();
-				view.removePrefix(1);
-				throw ex::ParserException(message, errorPos);
+				throw ex::ParserException(message, view.pos());
 			}
 			return result.value();
 		}
@@ -276,10 +277,6 @@ namespace compiler {
 			view(source) {
 		}
 
-		bool isSuccess() const {
-			return success;
-		}
-
 		void synchronize() {
 			while (!view.isEnd() and noneOf(*view, ';', ')', '}', ']')) {
 				view.removePrefix(1);
@@ -302,7 +299,7 @@ namespace compiler {
 		}
 
 		Token next(base::OpCode hint) {
-			return nextToken("Expected: " + base::opCodeNameUser(hint), hint);
+			return nextToken("Expected: "s + base::opCodeNameUser(hint).str, hint);
 		}
 
 		template<typename... T>
