@@ -4,11 +4,13 @@
 #define CATCH_CONFIG_RUNNER
 #define CATCH_CONFIG_CONSOLE_WIDTH 200
 
+#include "test/TokenizerTest.h"
 #include "test/OperatorTest.h"
 #include "test/ParserTest.h"
 #include "test/VariableTest.h"
 #include "test/ControlFlowTest.h"
 #include "test/FunctionTest.h"
+#include "test/CompleteTest.h"
 
 #include "test/catch.hpp"
 

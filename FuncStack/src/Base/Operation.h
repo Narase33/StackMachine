@@ -6,7 +6,8 @@
 #include "BasicType.h"
 
 namespace base {
-	struct Operation final {
+	class Operation final {
+	public:
 		explicit Operation(OpCode opCode, int32_t value) : _opCode(opCode) {
 			as.signedData = value;
 		}
@@ -49,12 +50,34 @@ namespace base {
 			return as.unsignedData;
 		}
 
+		int16_t side_signedData() const {
+			return side.signedData;
+		}
+
+		int16_t& side_signedData() {
+			return side.signedData;
+		}
+
+		uint16_t side_unsignedData() const {
+			return side.unsignedData;
+		}
+
+		uint16_t& side_unsignedData() {
+			return side.unsignedData;
+		}
+
 		OpCode getOpCode() const {
 			return _opCode;
 		}
 
 	private:
 		OpCode _opCode;
+
+		union {
+			int16_t signedData;
+			uint16_t unsignedData;
+		} side;
+
 		union {
 			int32_t signedData;
 			uint32_t unsignedData;

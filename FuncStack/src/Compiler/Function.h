@@ -47,6 +47,13 @@ namespace compiler {
 			return {};
 		}
 
+		size_t paramCount(const std::string& functionName) const {
+			const auto pos = std::find_if(functions.begin(), functions.end(), [&](const Function& f) {
+				return f.name == functionName;
+			});
+			return pos->params.size();
+		}
+
 		bool has(const std::string& functionName, std::optional<base::TypeIndex> returnType, const std::vector<Function::Variable>& params) const { // TODO optimize
 			return std::find(functions.begin(), functions.end(), Function{ functionName, returnType, params, 0 }) != functions.end();
 		}

@@ -24,7 +24,7 @@ namespace parserTest {
 				machine.exec();
 
 				INFO(machine.toString());
-				//REQUIRE(machine.getDataStack().size() == 1);
+				REQUIRE(machine.getDataStack().size() == 1);
 				REQUIRE((machine.getGlobalVariable(0) == expected).getBool());
 			} catch (const std::exception& e) {
 				FAIL(e.what());

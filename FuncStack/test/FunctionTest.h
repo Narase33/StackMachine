@@ -8,7 +8,7 @@ using namespace base;
 using namespace stackmachine;
 using namespace compiler;
 
-namespace ´functionTest {
+namespace functionTest {
 	TEST_CASE("Function-Test") {
 		std::string code = R"(
 int i = 0;
@@ -39,7 +39,7 @@ func main() {
 			machine.exec();
 
 			INFO(machine.toString());
-			//REQUIRE(machine.getDataStack().size() == 1);
+			REQUIRE(machine.getDataStack().size() == 3);
 			REQUIRE((machine.getGlobalVariable(0) == base::BasicType(1)).getBool());
 			REQUIRE((machine.getGlobalVariable(1) == base::BasicType(3)).getBool());
 			REQUIRE((machine.getGlobalVariable(2) == base::BasicType(4)).getBool());

@@ -60,7 +60,7 @@ namespace stackmachine {
 						dataStack.push_back(program.getConstant(pc->unsignedData()));
 						break;
 					case base::OpCode::STORE_LOCAL:
-						setVariable(pc->unsignedData(), dataStack.back());
+						setVariable(pc->unsignedData(), pop());
 						break;
 					case base::OpCode::LOAD_LOCAL:
 						dataStack.push_back(getVariable(pc->unsignedData()));
@@ -69,7 +69,7 @@ namespace stackmachine {
 						dataStack.push_back(base::BasicType::fromId(static_cast<base::TypeIndex>(pc->unsignedData())));
 						break;
 					case base::OpCode::STORE_GLOBAL:
-						setGlobalVariable(pc->unsignedData(), dataStack.back());
+						setGlobalVariable(pc->unsignedData(), pop());
 						break;
 					case base::OpCode::LOAD_GLOBAL:
 						dataStack.push_back(getGlobalVariable(pc->unsignedData()));
@@ -93,14 +93,24 @@ namespace stackmachine {
 						break;
 					case base::OpCode::CALL_FUNCTION:
 						functionCalls.push(pc);
-						functionsStackScopes.push(dataStack.size());
+						functionsStackScopes.push(dataStack.size() - pc->side_unsignedData());
 						pc += pc->signedData();
 						break;
 					case base::OpCode::END_FUNCTION:
 						pc = functionCalls.top();
 						functionCalls.pop();
+						dataStack.resize(functionsStackScopes.top());
 						functionsStackScopes.pop();
 						break;
+					case base::OpCode::RETURN:
+					{
+						base::BasicType returnValue = pop();
+						pc = functionCalls.top();
+						functionCalls.pop();
+						functionsStackScopes.pop();
+						dataStack.push_back(returnValue);
+					}
+					break;
 						// ==== COMPARE ====
 					case base::OpCode::EQ:
 						executeOP(std::equal_to());
@@ -138,7 +148,7 @@ namespace stackmachine {
 				}
 				pc++;
 			}
-			assert(dataStackScopes.size() == 1);
+			//assert(dataStackScopes.size() == 1);
 		}
 
 		std::string toString() const {
@@ -160,8 +170,9 @@ namespace stackmachine {
 
 			stream << "\nByteCode:\n";
 			for (int i = 0; i < program.bytecode.size(); i++) {
-				base::OpCode opCode = program.bytecode[i].getOpCode();
-				const int64_t value = program.bytecode[i].signedData();
+				const base::Operation& op = program.bytecode[i];
+				base::OpCode opCode = op.getOpCode();
+				const int64_t value = op.signedData();
 
 				stream << std::setw(3) << std::right << i << " | " << std::setw(20) << std::left << opCodeName(opCode) << " ";
 				switch (opCode) {
@@ -174,6 +185,9 @@ namespace stackmachine {
 						break;
 					case base::OpCode::LOAD_LITERAL:
 						stream << value << " (" << program.constants[value].toString() << ")";
+						break;
+					case base::OpCode::CALL_FUNCTION:
+						stream << op.side_unsignedData() << " params; jump " << value << " -> " << (i + value);
 						break;
 					case base::OpCode::END_SCOPE: // fallthrough
 					case base::OpCode::STORE_LOCAL: // fallthrough

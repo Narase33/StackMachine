@@ -47,6 +47,7 @@ namespace compiler {
 		ExtractorResult extractType(const StringWindow& nameLexem) {
 			const base::TypeIndex variableTypeId = base::stringToId(nameLexem);
 			if (variableTypeId != base::TypeIndex::Err) {
+				view.removePrefix(nameLexem.length());
 				return Token(base::OpCode::TYPE, static_cast<size_t>(variableTypeId), view.pos()); // Type
 			}
 			return {};
@@ -55,6 +56,7 @@ namespace compiler {
 		ExtractorResult extractKeyword(const StringWindow& nameLexem) {
 			const base::OpCode symbol = base::opCodeFromKeyword(nameLexem);
 			if (symbol != base::OpCode::ERR) {
+				view.removePrefix(nameLexem.length());
 				return Token(symbol, view.pos()); // Keyword
 			}
 			return {};
@@ -62,6 +64,7 @@ namespace compiler {
 
 		ExtractorResult extractName(const StringWindow& nameLexem) {
 			if (nameLexem.length() > 0) {
+				view.removePrefix(nameLexem.length());
 				return Token(base::OpCode::NAME, nameLexem.str(), view.pos()); // Name
 			}
 			return {};
@@ -145,7 +148,7 @@ namespace compiler {
 			}
 
 			const size_t pos = view.pos();
-			const cString opName = opCodeNameUser(hint);
+			const cString opName = opCodeName(hint);
 			if (view.startsWith(opName)) {
 				view.removePrefix(opName.length);
 				return Token(hint, pos);
@@ -172,7 +175,6 @@ namespace compiler {
 
 			// name lexems ->
 			const StringWindow nameLexem = extractLexem(partOfVariableName);
-			view.removePrefix(nameLexem.length());
 
 			result = extractKeyword(nameLexem);
 			if (result.has_value()) {
@@ -227,6 +229,7 @@ namespace compiler {
 				case base::OpCode::CONTINUE:
 				case base::OpCode::BREAK:
 				case base::OpCode::FUNC:
+				case base::OpCode::RETURN:
 					result = extractKeyword(extractLexem(partOfVariableName));
 					break;
 				case base::OpCode::TYPE:
@@ -299,7 +302,7 @@ namespace compiler {
 		}
 
 		Token next(base::OpCode hint) {
-			return nextToken("Expected: "s + base::opCodeNameUser(hint).str, hint);
+			return nextToken("Expected: "s + base::opCodeName(hint).str, hint);
 		}
 
 		template<typename... T>
@@ -318,7 +321,7 @@ namespace compiler {
 
 		template<typename... T>
 		Token next(T&&... expectedOpCode) {
-			return next("Expected any of: " + base::opCodeNameUser(expectedOpCode...), expectedOpCode...);
+			return next("Expected any of: " + base::opCodeName(expectedOpCode...), expectedOpCode...);
 		}
 	};
 }

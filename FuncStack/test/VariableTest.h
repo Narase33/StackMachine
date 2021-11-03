@@ -22,6 +22,7 @@ namespace variableTest {
 
 				machine.exec();
 				INFO(machine.toString());
+				REQUIRE(machine.getDataStack().size() == 1);
 				REQUIRE(machine.getGlobalVariable(0).getInt() == 3);
 			}
 
@@ -34,6 +35,7 @@ namespace variableTest {
 
 				machine.exec();
 				INFO(machine.toString());
+				REQUIRE(machine.getDataStack().size() == 1);
 				REQUIRE(machine.getGlobalVariable(0).getUint() == 3);
 			}
 
@@ -46,6 +48,7 @@ namespace variableTest {
 
 				machine.exec();
 				INFO(machine.toString());
+				REQUIRE(machine.getDataStack().size() == 1);
 				REQUIRE(machine.getGlobalVariable(0).getFloat() == 3.3);
 			}
 
@@ -58,6 +61,7 @@ namespace variableTest {
 
 				machine.exec();
 				INFO(machine.toString());
+				REQUIRE(machine.getDataStack().size() == 1);
 				REQUIRE(machine.getGlobalVariable(0).getBool() == true);
 			}
 
@@ -78,6 +82,7 @@ namespace variableTest {
 				machine.exec();
 				INFO(machine.toString());
 
+				REQUIRE(machine.getDataStack().size() == 4);
 				REQUIRE(machine.getGlobalVariable(0).getInt() == 1);
 				REQUIRE(machine.getGlobalVariable(1).getUint() == 2);
 				REQUIRE(machine.getGlobalVariable(2).getFloat() == 3.3);
@@ -102,6 +107,7 @@ namespace variableTest {
 			machine.exec();
 			INFO(machine.toString());
 
+			REQUIRE(machine.getDataStack().size() == 2);
 			REQUIRE(machine.getGlobalVariable(0).getInt() == 3);
 			REQUIRE(machine.getGlobalVariable(1).getInt() == 2);
 		}

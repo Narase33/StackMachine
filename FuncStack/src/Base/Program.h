@@ -22,6 +22,10 @@ namespace base {
 			return index;
 		}
 
+		base::Operation loadLiteralOperation(BasicType value) {
+			return base::Operation(base::OpCode::LOAD_LITERAL, addConstant(value));
+		}
+
 		const BasicType& getConstant(size_t index) const {
 			assert(constants.size() > index);
 			return constants[index];

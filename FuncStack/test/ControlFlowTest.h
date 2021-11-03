@@ -21,15 +21,11 @@ namespace controlFlowTest {
 				REQUIRE(compiler.isSuccess());
 
 				StackMachine machine(compiler.run());
-				INFO(machine.toString());
-
 				machine.exec();
-				INFO(machine.toString());
-				std::vector<BasicType> dataStack = machine.getDataStack();
-				//REQUIRE(dataStack.size() == 1);
 
+				INFO(machine.toString());
+				REQUIRE(machine.getDataStack().size() == 1);
 				REQUIRE(machine.getGlobalVariable(0).getInt() == expected.getInt());
-				dataStack.pop_back();
 			} catch (const std::exception& e) {
 				FAIL(e.what());
 			}
@@ -49,11 +45,10 @@ namespace controlFlowTest {
 				REQUIRE(compiler.isSuccess());
 
 				StackMachine machine(compiler.run());
-				INFO(machine.toString());
-
 				machine.exec();
+
 				INFO(machine.toString());
-				//REQUIRE(machine.getDataStack().size() == expected.size());
+				REQUIRE(machine.getDataStack().size() == 2);
 
 				for (int i = 0; i < expected.size(); i++) {
 					REQUIRE((machine.getGlobalVariable(i) == expected[i]).getBool());

@@ -73,19 +73,6 @@ namespace compiler {
 			return priority;
 		}
 
-		base::BasicType literalToValue(const Token& token) const {
-			if (std::holds_alternative<base::sm_int>(token.value)) {
-				return base::BasicType(std::get<base::sm_int>(token.value));
-			} else if (std::holds_alternative<base::sm_uint>(token.value)) {
-				return base::BasicType(std::get<base::sm_uint>(token.value));
-			} else if (std::holds_alternative<base::sm_float>(token.value)) {
-				return base::BasicType(std::get<base::sm_float>(token.value));
-			} else if (std::holds_alternative<base::sm_bool>(token.value)) {
-				return base::BasicType(std::get<base::sm_bool>(token.value));
-			}
-			throw ex::ParserException("Unknown value", token.pos);
-		}
-
 		std::vector<Token> unwindGroup() {
 			assert(anyOf(currentToken.opCode, base::OpCode::BRACKET_ROUND_OPEN, base::OpCode::BRACKET_CURLY_OPEN, base::OpCode::BRACKET_SQUARE_OPEN));
 			auto [bracketBegin, bracketEnd] = base::getBracketGroup(currentToken.opCode);
@@ -137,6 +124,8 @@ namespace compiler {
 					auto next = it + 1;
 					if ((next != tokens.end()) and (next->opCode == base::OpCode::BRACKET_ROUND_OPEN)) {
 						operatorStack.push(*it);
+						it++;
+						operatorStack.push(*it);
 					} else {
 						sortedTokens.push_back(*it);
 					}
@@ -176,7 +165,7 @@ namespace compiler {
 				sortedTokens.push_back(top_and_pop(operatorStack));
 			}
 
-			checkPlausibility(sortedTokens);
+			//checkPlausibility(sortedTokens);
 
 			for (auto it = sortedTokens.begin(); it != sortedTokens.end(); it++) {
 				const base::OpCode opCode = it->opCode;
@@ -206,11 +195,15 @@ namespace compiler {
 						bytecode.push_back(base::Operation(base::OpCode::LOAD_LITERAL, program.addConstant(literalToValue(*it))));
 						break;
 					case base::OpCode::NAME:
-						if (functions.has(it->get<std::string>())) {
-							insertJump(base::OpCode::CALL_FUNCTION, index(), functions.offset(it->get<std::string>()).value());
+					{
+						const std::string& name = it->get<std::string>();
+						if (functions.has(name)) {
+							insertJump(base::OpCode::CALL_FUNCTION, index(), functions.offset(name).value());
+							bytecode.back().side_unsignedData() = functions.paramCount(name);
 						} else {
 							bytecode.push_back(scope.createLoadOperation(*it));
 						}
+					}
 						break;
 					default:
 						throw ex::ParserException("Unknown token after shunting yard", it->pos);
@@ -308,10 +301,10 @@ namespace compiler {
 
 		Function::Variable extractParameter() {
 			assert(currentToken.opCode == base::OpCode::TYPE);
-			const Token& paramType = currentToken;
+			const Token paramType = currentToken;
 
 			currentToken = tokenizer.next(base::OpCode::NAME);
-			const Token& paramName = currentToken;
+			const Token paramName = currentToken;
 
 			currentToken = tokenizer.next(base::OpCode::COMMA, base::OpCode::BRACKET_ROUND_CLOSE);
 			return Function::Variable{ static_cast<base::TypeIndex>(paramType.get<size_t>()), paramName.get<std::string>() };
@@ -355,12 +348,28 @@ namespace compiler {
 			bytecode.push_back(base::Operation(base::OpCode::JUMP, 0));
 			const size_t jumpIndex = index();
 
-			bool isNewFunction = functions.push(functionName.get<std::string>(), returnType, std::move(parameters), index());
+			bool isNewFunction = functions.push(functionName.get<std::string>(), returnType, parameters, index());
 			assume(isNewFunction, "Function already known", currentToken);
 
+			scope.pushScope();
+			for (const Function::Variable& var : parameters) { // TODO shitshow
+				const bool unknownVariable = scope.pushVariable(var.name, static_cast<size_t>(var.type));
+				assume(unknownVariable, "Variable already defined", currentToken);
+			}
+
 			compileStatement();
+			scope.popScope();
+
 			bytecode.push_back(base::Operation(base::OpCode::END_FUNCTION));
 			rewireJump(jumpIndex, index());
+		}
+
+		void parse_return() { // TODO better!
+			assert(currentToken.opCode == base::OpCode::RETURN);
+			currentToken = tokenizer.next();
+			const uint32_t returnSize = currentToken.opCode == base::OpCode::END_STATEMENT ? 0 : 1;
+			embeddCodeStatement();
+			bytecode.push_back(base::Operation(base::OpCode::RETURN, returnSize));
 		}
 
 		void registerBreaker() {
@@ -393,7 +402,10 @@ namespace compiler {
 			}
 			assume(!currentToken.isEnd(), "Missing end statement!", currentToken);
 
-			shuntingYard(tokens);
+			if (tokens.size() > 0) {
+				shuntingYard(tokens);
+			}
+
 			currentToken = tokenizer.next();
 		}
 
@@ -415,11 +427,13 @@ namespace compiler {
 					// fallthrough
 					case base::OpCode::NAME:
 						if (peak().opCode == base::OpCode::ASSIGN) {
+							//currentToken = tokenizer.next();
 							assert(std::holds_alternative<std::string>(currentToken.value));
 							base::Operation storeOperation = scope.createStoreOperation(currentToken);
 							currentToken = tokenizer.next(); currentToken = tokenizer.next();
 							embeddCodeStatement();
 							bytecode.push_back(std::move(storeOperation));
+							//bytecode.push_back(base::Operation(base::OpCode::POP));
 						} else {
 							embeddCodeStatement();
 						}
@@ -433,6 +447,9 @@ namespace compiler {
 					case base::OpCode::FUNC:
 						parse_function();
 						break;
+					case base::OpCode::RETURN:
+						parse_return();
+						break;
 					case base::OpCode::CONTINUE: // fallthrough
 					case base::OpCode::BREAK:
 						registerBreaker();
@@ -443,6 +460,8 @@ namespace compiler {
 					case base::OpCode::BRACKET_ROUND_OPEN:
 						insertRoundBrackets();
 						break;
+					case base::OpCode::END_STATEMENT:
+						break;
 					default:
 						throw ex::ParserException("Unknown token", currentToken.pos);
 				}
@@ -450,7 +469,7 @@ namespace compiler {
 				synchronize(ex);
 			}
 		}
-		
+
 	public:
 		bool isSuccess() const {
 			return success;
@@ -480,7 +499,10 @@ namespace compiler {
 				if (success) {
 					const std::optional<size_t> mainPosition = functions.offset("main", {}, {});
 					assume(mainPosition.has_value(), "No main function in code", currentToken);
+
 					insertJump(base::OpCode::CALL_FUNCTION, index(), mainPosition.value());
+					bytecode.back().side_unsignedData() = 0;
+					
 					bytecode.push_back(base::Operation(base::OpCode::END_PROGRAM));
 				}
 			} catch (const ex::ParserException& ex) {
