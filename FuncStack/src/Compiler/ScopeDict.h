@@ -39,6 +39,10 @@ namespace compiler {
 			return entities.end();
 		}
 
+		size_t size() const {
+			return entities.size();
+		}
+
 		std::vector<T>& list() {
 			return entities;
 		}
@@ -62,7 +66,7 @@ namespace compiler {
 
 	public:
 		struct Breaker {
-			size_t index, breakCount, level;
+			size_t index, breakCount, level, variables;
 			Token token;
 		};
 
@@ -82,16 +86,18 @@ namespace compiler {
 			scopeLevel++;
 		}
 
-		void popScope() {
+		uint32_t popScope() {
 			const auto pos = std::find_if(variables.begin(), variables.end(), [=](const Variable& v) {
 				return v.level == scopeLevel;
 			});
+			uint32_t count = std::distance(pos, variables.end());
 			variables.list().erase(pos, variables.end());
 			scopeLevel--;
+			return count;
 		}
 
 		void pushBreaker(size_t index, size_t breakCount, Token token) {
-			breakers.push_back({ index, breakCount, scopeLevel, token });
+			breakers.push_back({ index, breakCount, scopeLevel, variables.size(), token });
 		}
 
 		void pushLoop() {
@@ -140,6 +146,10 @@ namespace compiler {
 
 		std::optional<size_t> offsetLocalVariable(const std::string& variableName) const {
 			return variables.offset({ 0, variableName, 0 });
+		}
+
+		size_t sizeLocalVariables() const {
+			return variables.size();
 		}
 
 		std::optional<size_t> offsetGlobalVariable(const std::string& variableName) const {

@@ -42,7 +42,6 @@ namespace controlFlowTest {
 				code += "}";
 
 				Compiler compiler(std::move(code));
-				REQUIRE(compiler.isSuccess());
 
 				StackMachine machine(compiler.run());
 				machine.exec();

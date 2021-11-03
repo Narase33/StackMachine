@@ -29,3 +29,10 @@ constexpr bool noneOf(T t, T2 t2, T3... t3) {
 	static_assert(std::is_same<T, T2>::value);
 	return (t != t2) and noneOf(t, t3...);
 }
+
+template<typename T>
+T top_and_pop(std::stack<T, std::vector<T>>& stack) {
+	T t = stack.top();
+	stack.pop();
+	return t;
+}

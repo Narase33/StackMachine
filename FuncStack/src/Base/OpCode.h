@@ -17,6 +17,7 @@ namespace base {
 		BRACKET_SQUARE_OPEN, BRACKET_SQUARE_CLOSE,
 		TYPE,
 		NAME, FUNC, RETURN,
+		BEGIN_SCOPE, END_SCOPE,
 
 		// Lexer + Interpreter
 		LOAD_LITERAL,
@@ -28,7 +29,7 @@ namespace base {
 		ASSIGN,
 
 		// Interpreter
-		BEGIN_SCOPE, END_SCOPE, CALL_FUNCTION, END_FUNCTION,
+		CALL_FUNCTION, END_FUNCTION,
 		END_PROGRAM,
 		LOAD_LOCAL, LOAD_GLOBAL, STORE_LOCAL, STORE_GLOBAL,
 		JUMP, JUMP_IF_NOT,
@@ -60,6 +61,8 @@ namespace base {
 			SM_REGISTER_NAME(OpCode::NAME, "<name>");
 			SM_REGISTER_NAME(OpCode::FUNC, "func");
 			SM_REGISTER_NAME(OpCode::RETURN, "return");
+			SM_REGISTER_NAME(OpCode::BEGIN_SCOPE, "<begin_scope>");
+			SM_REGISTER_NAME(OpCode::END_SCOPE, "<end_scope>");
 
 			// Lexer + Interpreter
 			SM_REGISTER_NAME(OpCode::LOAD_LITERAL, "<literal>");
@@ -76,8 +79,6 @@ namespace base {
 			SM_REGISTER_NAME(OpCode::ASSIGN, "=");
 
 			// Interpreter
-			SM_REGISTER_NAME(OpCode::BEGIN_SCOPE, "<begin_scope>");
-			SM_REGISTER_NAME(OpCode::END_SCOPE, "<end_scope>");
 			SM_REGISTER_NAME(OpCode::CALL_FUNCTION, "<call_function>");
 			SM_REGISTER_NAME(OpCode::END_FUNCTION, "<end_function>");
 			SM_REGISTER_NAME(OpCode::END_PROGRAM, "<end_program>");

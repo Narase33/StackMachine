@@ -35,6 +35,13 @@ namespace compiler {
 			return bytecode.size() - 1;
 		}
 
+		void popScope() {
+			const uint32_t variablePopCount = scope.popScope();
+			if (variablePopCount > 0) {
+				bytecode.push_back(base::Operation(base::OpCode::POP, variablePopCount));
+			}
+		}
+
 		void rewireJump(size_t from, size_t to) {
 			base::Operation& jump = bytecode[from];
 			assume(anyOf(jump.getOpCode(), base::OpCode::JUMP, base::OpCode::JUMP_IF_NOT, base::OpCode::CALL_FUNCTION), "expected to rewire jump", currentToken);
@@ -98,12 +105,6 @@ namespace compiler {
 				assume(score >= 0, "Plausibility check failed", currentToken);
 			}
 			assume(score == 1, "Plausibility check failed", currentToken);
-		}
-
-		Token top_and_pop(std::stack<Token, std::vector<Token>>& stack) {
-			Token t = stack.top();
-			stack.pop();
-			return t;
 		}
 
 		void shuntingYard(const std::vector<Token>& tokens) {
@@ -212,7 +213,6 @@ namespace compiler {
 		}
 
 		void insertCurlyBrackets() {
-			bytecode.push_back(base::Operation(base::OpCode::BEGIN_SCOPE));
 			scope.pushScope();
 			assert(currentToken.opCode == base::OpCode::BRACKET_CURLY_OPEN);
 			currentToken = tokenizer.next();
@@ -221,8 +221,7 @@ namespace compiler {
 				compileStatement();
 			}
 
-			scope.popScope();
-			bytecode.push_back(base::Operation(base::OpCode::END_SCOPE, 1));
+			popScope();
 
 			assert(currentToken.opCode == base::OpCode::BRACKET_CURLY_CLOSE);
 			currentToken = tokenizer.next();
@@ -239,7 +238,9 @@ namespace compiler {
 
 			bytecode.push_back(base::Operation(jump, 0)); // jump over block
 			const size_t jumpIndex = index();
+			scope.pushScope();
 			compileStatement();
+			popScope();
 			rewireJump(jumpIndex, index());
 			return jumpIndex;
 		}
@@ -272,7 +273,9 @@ namespace compiler {
 			const size_t jumpIndex = index();
 
 			scope.pushLoop();
+			scope.pushScope();
 			compileStatement(); // TODO Single statement need scope
+			popScope();
 			const std::vector<ScopeDict::Breaker> breakers = scope.popLoop();
 
 			insertJump(base::OpCode::JUMP, index(), headIndex);
@@ -292,10 +295,10 @@ namespace compiler {
 				}
 
 				base::Operation& endScopeOp = bytecode[breaker.index - 1];
-				assert(endScopeOp.getOpCode() == base::OpCode::END_SCOPE);
+				assert(endScopeOp.getOpCode() == base::OpCode::POP);
 				const int32_t levelsToBreak = breaker.level - scope.level();
-				assume(levelsToBreak > 0, "Too many levels to break: " + std::to_string(levelsToBreak), currentToken);
-				endScopeOp.signedData() = levelsToBreak;
+				assume(levelsToBreak > 0, "Too many levels to break", currentToken);
+				endScopeOp.signedData() = breaker.variables - scope.sizeLocalVariables();
 			}
 		}
 
@@ -358,7 +361,7 @@ namespace compiler {
 			}
 
 			compileStatement();
-			scope.popScope();
+			popScope();
 
 			bytecode.push_back(base::Operation(base::OpCode::END_FUNCTION));
 			rewireJump(jumpIndex, index());
@@ -386,7 +389,7 @@ namespace compiler {
 				currentToken = tokenizer.next(base::OpCode::END_STATEMENT);
 			}
 
-			bytecode.push_back(base::Operation(base::OpCode::END_SCOPE, 0));
+			bytecode.push_back(base::Operation(base::OpCode::POP, 0));
 			bytecode.push_back(base::Operation(base::OpCode::JUMP, 0));
 			scope.pushBreaker(index(), levelsToJump, breaker);
 
@@ -427,13 +430,11 @@ namespace compiler {
 					// fallthrough
 					case base::OpCode::NAME:
 						if (peak().opCode == base::OpCode::ASSIGN) {
-							//currentToken = tokenizer.next();
 							assert(std::holds_alternative<std::string>(currentToken.value));
 							base::Operation storeOperation = scope.createStoreOperation(currentToken);
 							currentToken = tokenizer.next(); currentToken = tokenizer.next();
 							embeddCodeStatement();
 							bytecode.push_back(std::move(storeOperation));
-							//bytecode.push_back(base::Operation(base::OpCode::POP));
 						} else {
 							embeddCodeStatement();
 						}

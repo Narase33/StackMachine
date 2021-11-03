@@ -20,6 +20,8 @@ namespace completeTest {
 			StackMachine machine(std::move(program));
 			INFO(machine.toString());
 
+			std::cout << machine.toString() << std::endl;
+
 			const auto machineStart = std::chrono::steady_clock::now();
 			machine.exec();
 			std::cout << "Exec time:\t" << (std::chrono::steady_clock::now() - machineStart) << std::endl;
@@ -28,7 +30,6 @@ namespace completeTest {
 			REQUIRE(machine.getDataStack().size() == 1);
 			REQUIRE((machine.getGlobalVariable(0) == base::BasicType(3)).getBool());
 
-			std::cout << machine.toString() << std::endl;
 		} catch (const std::exception& e) {
 			FAIL(e.what());
 		}

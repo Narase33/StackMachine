@@ -14,8 +14,7 @@ namespace stackmachine {
 		StackMachine(base::Program toExecute)
 			: program(std::move(toExecute)) {
 			pc = program.bytecode.begin();
-			dataStackScopes.push(0);
-			functionsStackScopes.push(0);
+			functionFrames.push(0);
 		}
 
 		size_t addVariable(base::BasicType variableValue) {
@@ -24,13 +23,13 @@ namespace stackmachine {
 		}
 
 		void setVariable(size_t offset, base::BasicType variableValue) {
-			offset += functionsStackScopes.top();
+			offset += functionFrames.top();
 			assert(offset < dataStack.size());
 			dataStack[offset] = std::move(variableValue);
 		}
 
 		base::BasicType getVariable(size_t offset) const {
-			offset += functionsStackScopes.top();
+			offset += functionFrames.top();
 			assert(offset < dataStack.size());
 			return dataStack[offset];
 		}
@@ -54,7 +53,12 @@ namespace stackmachine {
 				switch (pc->getOpCode()) {
 					// ==== META ====
 					case base::OpCode::POP:
-						dataStack.pop_back();
+					{
+						uint32_t popCount = pc->unsignedData();
+						for (int i = 0; i < popCount; i++) {
+							dataStack.pop_back();
+						}
+					}
 						break;
 					case base::OpCode::LOAD_LITERAL:
 						dataStack.push_back(program.getConstant(pc->unsignedData()));
@@ -82,32 +86,18 @@ namespace stackmachine {
 							pc += pc->signedData();
 						}
 						break;
-					case base::OpCode::BEGIN_SCOPE:
-						dataStackScopes.push(dataStack.size());
-						break;
-					case base::OpCode::END_SCOPE:
-						for (int i = 0; i < pc->signedData(); i++) {
-							dataStack.erase(dataStack.begin() + dataStackScopes.top(), dataStack.end());
-							dataStackScopes.pop();
-						}
-						break;
 					case base::OpCode::CALL_FUNCTION:
-						functionCalls.push(pc);
-						functionsStackScopes.push(dataStack.size() - pc->side_unsignedData());
+						pcHistory.push(pc);
+						functionFrames.push(dataStack.size() - pc->side_unsignedData());
 						pc += pc->signedData();
 						break;
 					case base::OpCode::END_FUNCTION:
-						pc = functionCalls.top();
-						functionCalls.pop();
-						dataStack.resize(functionsStackScopes.top());
-						functionsStackScopes.pop();
+						endFunction();
 						break;
 					case base::OpCode::RETURN:
 					{
 						base::BasicType returnValue = pop();
-						pc = functionCalls.top();
-						functionCalls.pop();
-						functionsStackScopes.pop();
+						endFunction();
 						dataStack.push_back(returnValue);
 					}
 					break;
@@ -148,7 +138,7 @@ namespace stackmachine {
 				}
 				pc++;
 			}
-			//assert(dataStackScopes.size() == 1);
+			assert(functionFrames.size() == 1);
 		}
 
 		std::string toString() const {
@@ -191,7 +181,8 @@ namespace stackmachine {
 						break;
 					case base::OpCode::END_SCOPE: // fallthrough
 					case base::OpCode::STORE_LOCAL: // fallthrough
-					case base::OpCode::LOAD_LOCAL:
+					case base::OpCode::LOAD_LOCAL: // fallthrough
+					case base::OpCode::POP:
 						stream << value;
 						break;
 				}
@@ -209,9 +200,9 @@ namespace stackmachine {
 	private:
 		using PcType = std::vector<base::Operation>::const_iterator;
 
-		std::stack<size_t, std::vector<size_t>> dataStackScopes;
-		std::stack<size_t, std::vector<size_t>> functionsStackScopes;
-		std::stack<PcType, std::vector<PcType>> functionCalls;
+		std::stack<PcType, std::vector<PcType>> pcHistory;
+
+		std::stack<size_t, std::vector<size_t>> functionFrames;
 		std::vector<base::BasicType> dataStack;
 
 		base::Program program;
@@ -234,6 +225,11 @@ namespace stackmachine {
 		void executeOP(ExecutionFunction func, const base::BasicType& operand) {
 			const base::BasicType a = pop();
 			dataStack.push_back(func(a, operand));
+		}
+
+		void endFunction() {
+			pc = top_and_pop(pcHistory);
+			dataStack.resize(top_and_pop(functionFrames));
 		}
 	};
 }
