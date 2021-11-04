@@ -14,7 +14,7 @@
 
 #include "test/catch.hpp"
 
-#include "src/Compiler/Compiler.h"
+#include "test/Benchmarks/Tokenizer_Numbers.h"
 
 /* TODO
 	- String interning
@@ -30,6 +30,8 @@ int main(int argc, char* argv[]) {
 	session.configData().showSuccessfulTests = false;
 	session.configData().showDurations = Catch::ShowDurations::Always;
 	const int testReturn = session.run(argc, argv);
+
+	benchmark::tokenizer::run();
 
 	printSize<base::Operation>("Operation");
 	printSize<base::BasicType>("BasicType");

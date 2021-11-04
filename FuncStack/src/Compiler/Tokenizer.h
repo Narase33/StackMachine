@@ -3,6 +3,7 @@
 #include <string>
 #include <cctype>
 #include <functional>
+#include <algorithm>
 #include <optional>
 #include <sstream>
 
@@ -40,7 +41,7 @@ namespace compiler {
 
 		StringWindow extractNumber() {
 			return extractLexem([](char c) -> bool {
-				return std::isdigit(c);
+				return (c >= '0') and (c <= '9'); // faster than std::isdigit
 			});
 		}
 
@@ -87,7 +88,7 @@ namespace compiler {
 			}
 
 			if (std::isdigit(*view)) {
-				StringWindow number = extractNumber(); // TODO Better
+				StringWindow number = extractNumber();
 				view.removePrefix(number.length());
 
 				if (!view.isEnd() and (*view == '.')) {
@@ -109,10 +110,10 @@ namespace compiler {
 
 				if (!view.isEnd() and (*view == 'u')) {
 					view.removePrefix(1);
-					return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_uint>(std::stoul(number.str())), pos); // Literal Long
+					return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_uint>(std::stoull(number.str())), pos); // Literal Long
 				}
 
-				return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_int>(std::stol(number.str())), pos); // Literal Long
+				return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_int>(std::stoll(number.str())), pos); // Literal Long
 			}
 
 			return {};
@@ -194,7 +195,7 @@ namespace compiler {
 			throw ex::ParserException("Could not recognize token", view.pos());
 		}
 
-		Token extract(std::string&& message, base::OpCode hint) {
+		Token extract(base::OpCode hint) {
 			skipWhitespace();
 			if (view.isEnd()) {
 				return Token(base::OpCode::END_PROGRAM, view.pos());
@@ -244,7 +245,7 @@ namespace compiler {
 			}
 
 			if (!result.has_value()) {
-				throw ex::ParserException(message, view.pos());
+				return Token(base::OpCode::ERR, view.pos());
 			}
 			return result.value();
 		}
@@ -259,9 +260,9 @@ namespace compiler {
 			return t;
 		}
 
-		Token nextToken(std::string&& message, base::OpCode hint) {
+		Token nextToken(base::OpCode hint) {
 			if (!peaked.has_value()) {
-				return extract(std::move(message), hint);
+				return extract(hint);
 			}
 
 			Token t = std::move(peaked.value());
@@ -297,12 +298,20 @@ namespace compiler {
 			return nextToken();
 		}
 
-		Token next(std::string&& message, base::OpCode hint) {
-			return nextToken(std::move(message), hint);
+		Token next(const std::string& message, base::OpCode hint) {
+			Token token = nextToken(hint);
+			if (token.opCode == base::OpCode::ERR) {
+				throw ex::ParserException(message, token.pos);
+			}
+			return token;
 		}
 
 		Token next(base::OpCode hint) {
-			return nextToken("Expected: "s + base::opCodeName(hint).str, hint);
+			Token token = nextToken(hint);
+			if (token.opCode == base::OpCode::ERR) {
+				throw ex::ParserException("Expected: "s + base::opCodeName(hint).str, token.pos);
+			}
+			return token;
 		}
 
 		template<typename... T>

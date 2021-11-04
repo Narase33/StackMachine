@@ -27,7 +27,6 @@ namespace compiler {
 
 		base::Program program;
 		base::Bytecode& bytecode = program.bytecode;
-		std::vector<base::BasicType>& literals = program.constants;
 
 		bool success = true;
 
@@ -55,10 +54,6 @@ namespace compiler {
 			int32_t jumpDistance = to - from;
 			if (jumpDistance < 0) jumpDistance--;
 			bytecode.push_back(base::Operation(jump, jumpDistance));
-		}
-
-		const Token& peak() {
-			return tokenizer.peak();
 		}
 
 		void assume(bool condition, const std::string& message, const Token& t) const {
@@ -429,7 +424,7 @@ namespace compiler {
 					}
 					// fallthrough
 					case base::OpCode::NAME:
-						if (peak().opCode == base::OpCode::ASSIGN) {
+						if (tokenizer.peak().opCode == base::OpCode::ASSIGN) {
 							assert(std::holds_alternative<std::string>(currentToken.value));
 							base::Operation storeOperation = scope.createStoreOperation(currentToken);
 							currentToken = tokenizer.next(); currentToken = tokenizer.next();

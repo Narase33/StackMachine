@@ -14,7 +14,6 @@ namespace stackmachine {
 		StackMachine(base::Program toExecute)
 			: program(std::move(toExecute)) {
 			pc = program.bytecode.begin();
-			functionFrames.push(0);
 		}
 
 		size_t addVariable(base::BasicType variableValue) {
@@ -138,7 +137,7 @@ namespace stackmachine {
 				}
 				pc++;
 			}
-			assert(functionFrames.size() == 1);
+			assert(functionFrames.size() == 0);
 		}
 
 		std::string toString() const {
