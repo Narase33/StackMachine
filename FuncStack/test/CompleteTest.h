@@ -15,6 +15,7 @@ namespace completeTest {
 
 			const auto compilerStart = std::chrono::steady_clock::now();
 			Program program = compiler.run();
+			REQUIRE(compiler.isSuccess());
 			std::cout << "Compile time:\t" << (std::chrono::steady_clock::now() - compilerStart) << std::endl;
 
 			StackMachine machine(std::move(program));

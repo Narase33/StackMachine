@@ -15,9 +15,10 @@ namespace variableTest {
 		SECTION("Basic Tests") {
 			{
 				Compiler compiler("int value = 3;" + main);
+				base::Program program = compiler.run();
 				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.run());
+				StackMachine machine(std::move(program));
 				INFO(machine.toString());
 
 				machine.exec();
@@ -28,9 +29,10 @@ namespace variableTest {
 
 			{
 				Compiler compiler("uint value = 3u;" + main);
+				base::Program program = compiler.run();
 				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.run());
+				StackMachine machine(std::move(program));
 				INFO(machine.toString());
 
 				machine.exec();
@@ -41,9 +43,10 @@ namespace variableTest {
 
 			{
 				Compiler compiler("float value = 3.3;" + main);
+				base::Program program = compiler.run();
 				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.run());
+				StackMachine machine(std::move(program));
 				INFO(machine.toString());
 
 				machine.exec();
@@ -54,9 +57,10 @@ namespace variableTest {
 
 			{
 				Compiler compiler("bool value = true;" + main);
+				base::Program program = compiler.run();
 				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.run());
+				StackMachine machine(std::move(program));
 				INFO(machine.toString());
 
 				machine.exec();
@@ -74,9 +78,10 @@ namespace variableTest {
 					+ main;
 
 				Compiler compiler(std::move(code));
+				base::Program program = compiler.run();
 				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.run());
+				StackMachine machine(std::move(program));
 				INFO(machine.toString());
 
 				machine.exec();
@@ -99,9 +104,10 @@ namespace variableTest {
 				"}";
 
 			Compiler compiler(std::move(code));
+			base::Program program = compiler.run();
 			REQUIRE(compiler.isSuccess());
 
-			StackMachine machine(compiler.run());
+			StackMachine machine(std::move(program));
 			INFO(machine.toString());
 
 			machine.exec();

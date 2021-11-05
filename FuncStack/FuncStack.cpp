@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
 	session.configData().showDurations = Catch::ShowDurations::Always;
 	const int testReturn = session.run(argc, argv);
 
-	benchmark::tokenizer::run();
+	//benchmark::tokenizer::run();
 
 	printSize<base::Operation>("Operation");
 	printSize<base::BasicType>("BasicType");

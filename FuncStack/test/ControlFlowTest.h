@@ -18,9 +18,10 @@ namespace controlFlowTest {
 				code += "}";
 
 				Compiler compiler(std::move(code));
+				base::Program program = compiler.run();
 				REQUIRE(compiler.isSuccess());
 
-				StackMachine machine(compiler.run());
+				StackMachine machine(std::move(program));
 				machine.exec();
 
 				INFO(machine.toString());
@@ -188,5 +189,14 @@ namespace controlFlowTest {
 			"	}\n"
 			"}";
 		test_variable(std::move(code), { BasicType(5), BasicType(8) });
+	}
+
+	TEST_CASE("ControlFlow-Test-for") {
+		std::string code = R"(
+for (int j = 0; j < 10; j++) {
+	i++;
+}
+)";
+		test_dataStack(std::move(code), BasicType(10));
 	}
 }

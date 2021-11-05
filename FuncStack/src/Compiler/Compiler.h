@@ -15,7 +15,13 @@
 #include "src/Base/Program.h"
 
 namespace compiler {
+	bool isEndStatement(const Token& t) {
+		return t.opCode == base::OpCode::END_STATEMENT;
+	}
+
 	class Compiler {
+		using Iterator = std::vector<Token>::const_iterator;
+
 		Source source;
 
 		Tokenizer tokenizer;
@@ -102,45 +108,46 @@ namespace compiler {
 			assume(score == 1, "Plausibility check failed", currentToken);
 		}
 
-		void shuntingYard(const std::vector<Token>& tokens) {
+		void shuntingYard(Iterator begin, Iterator end) {
+			Iterator current = begin;
 			std::stack<Token, std::vector<Token>> operatorStack;
 			std::vector<Token> sortedTokens;
 
-			for (auto it = tokens.begin(); it != tokens.end(); it++) {
-				if (it->opCode == base::OpCode::COMMA) {
+			for (; current != end; current++) {
+				if (current->opCode == base::OpCode::COMMA) {
 					continue;
 				}
 
-				if (it->opCode == base::OpCode::LOAD_LITERAL) {
-					sortedTokens.push_back(*it);
+				if (current->opCode == base::OpCode::LOAD_LITERAL) {
+					sortedTokens.push_back(*current);
 					continue;
 				}
 
-				if (it->opCode == base::OpCode::NAME) {
-					auto next = it + 1;
-					if ((next != tokens.end()) and (next->opCode == base::OpCode::BRACKET_ROUND_OPEN)) {
-						operatorStack.push(*it);
-						it++;
-						operatorStack.push(*it);
+				if (current->opCode == base::OpCode::NAME) {
+					auto next = current + 1;
+					if ((next != end) and (next->opCode == base::OpCode::BRACKET_ROUND_OPEN)) {
+						operatorStack.push(*current);
+						current++;
+						operatorStack.push(*current);
 					} else {
-						sortedTokens.push_back(*it);
+						sortedTokens.push_back(*current);
 					}
 					continue;
 				}
 
-				if (base::isOpeningBracket(it->opCode)) {
-					operatorStack.push(*it);
+				if (base::isOpeningBracket(current->opCode)) {
+					operatorStack.push(*current);
 					continue;
 				}
 
-				if (base::isClosingBracket(it->opCode)) {
-					auto [bracketOpen, bracketClose] = base::getBracketGroup(it->opCode);
+				if (base::isClosingBracket(current->opCode)) {
+					auto [bracketOpen, bracketClose] = base::getBracketGroup(current->opCode);
 
 					while (!operatorStack.empty() and (operatorStack.top().opCode != bracketOpen)) {
-						assume(!base::isOpeningBracket(operatorStack.top().opCode), "Found closing bracket that doesnt match", *it);
+						assume(!base::isOpeningBracket(operatorStack.top().opCode), "Found closing bracket that doesnt match", *current);
 						sortedTokens.push_back(top_and_pop(operatorStack));
 					}
-					assume(operatorStack.size() > 0, "Group didnt end", tokens.front());
+					assume(operatorStack.size() > 0, "Group didnt end", *begin);
 
 					operatorStack.pop();
 
@@ -151,10 +158,10 @@ namespace compiler {
 					continue;
 				}
 
-				while (!operatorStack.empty() and (getCheckedPriority(operatorStack.top()) >= getCheckedPriority(*it))) {
+				while (!operatorStack.empty() and (getCheckedPriority(operatorStack.top()) >= getCheckedPriority(*current))) {
 					sortedTokens.push_back(top_and_pop(operatorStack));
 				}
-				operatorStack.push(*it);
+				operatorStack.push(*current);
 			}
 
 			while (!operatorStack.empty()) {
@@ -200,7 +207,7 @@ namespace compiler {
 							bytecode.push_back(scope.createLoadOperation(*it));
 						}
 					}
-						break;
+					break;
 					default:
 						throw ex::ParserException("Unknown token after shunting yard", it->pos);
 				}
@@ -223,8 +230,9 @@ namespace compiler {
 		}
 
 		void insertRoundBrackets() {
+			assert(currentToken.opCode == base::OpCode::BRACKET_ROUND_OPEN);
 			const std::vector<Token> tokens = unwindGroup();
-			shuntingYard(tokens);
+			shuntingYard(tokens.begin(), tokens.end());
 		}
 
 		template<base::OpCode jump>
@@ -269,9 +277,66 @@ namespace compiler {
 
 			scope.pushLoop();
 			scope.pushScope();
-			compileStatement(); // TODO Single statement need scope
+			compileStatement();
 			popScope();
 			const std::vector<ScopeDict::Breaker> breakers = scope.popLoop();
+
+			insertJump(base::OpCode::JUMP, index(), headIndex);
+			const size_t indexAfterLoop = index();
+			rewireJump(jumpIndex, indexAfterLoop);
+
+			for (const ScopeDict::Breaker& breaker : breakers) {
+				switch (breaker.token.opCode) {
+					case base::OpCode::CONTINUE:
+						rewireJump(breaker.index, headIndex + 1); /* "pc++" */
+						break;
+					case base::OpCode::BREAK:
+						rewireJump(breaker.index, indexAfterLoop);
+						break;
+					default:
+						throw ex::ParserException("Unexpected breaker", breaker.token.pos);
+				}
+
+				base::Operation& endScopeOp = bytecode[breaker.index - 1];
+				assert(endScopeOp.getOpCode() == base::OpCode::POP);
+				const int32_t levelsToBreak = breaker.level - scope.level();
+				assume(levelsToBreak > 0, "Too many levels to break", currentToken);
+				endScopeOp.signedData() = breaker.variables - scope.sizeLocalVariables();
+			}
+		}
+
+		void parse_for() {
+			assert(currentToken.opCode == base::OpCode::FOR);
+
+			currentToken = tokenizer.next("Missing round brackets after 'while'", base::OpCode::BRACKET_ROUND_OPEN);
+			const std::vector<Token> loopHead = unwindGroup();
+
+			const auto endStatement1 = std::find_if(loopHead.begin(), loopHead.end(), isEndStatement);
+			assume(endStatement1 != loopHead.end(), "missing condition section in for-loop head", currentToken);
+
+			const auto endStatement2 = std::find_if(endStatement1 + 1, loopHead.end(), isEndStatement);
+			assume(endStatement2 != loopHead.end(), "missing iterative section in for-loop head", currentToken);
+
+			const auto endStatement3 = std::find_if(endStatement2 + 1, loopHead.end(), isEndStatement);
+			assume(endStatement3 == loopHead.end(), "found 4th section in for-loop head", currentToken);
+
+
+			scope.pushScope();
+			
+			shuntingYard(loopHead.begin(), endStatement1);
+			
+			const size_t headIndex = index();
+			shuntingYard(endStatement1 + 1, endStatement2);
+
+			bytecode.push_back(base::Operation(base::OpCode::JUMP_IF_NOT, 0));
+			const size_t jumpIndex = index();
+			
+			scope.pushLoop();
+			compileStatement();
+			shuntingYard(endStatement2 + 1, loopHead.end());
+			const std::vector<ScopeDict::Breaker> breakers = scope.popLoop();
+			
+			popScope();
 
 			insertJump(base::OpCode::JUMP, index(), headIndex);
 			const size_t indexAfterLoop = index();
@@ -329,7 +394,7 @@ namespace compiler {
 
 		void parse_function() { // TODO optimize
 			assert(currentToken.opCode == base::OpCode::FUNC);
-			assume(scope.level() == 0, "Function declarations allowed only on global scope", currentToken); // TODO removed in future
+			assume(scope.level() == 0, "Function declarations allowed only on global scope", currentToken); // removed in future
 			currentToken = tokenizer.next(base::OpCode::TYPE, base::OpCode::NAME);
 
 			std::optional<base::TypeIndex> returnType;
@@ -350,7 +415,7 @@ namespace compiler {
 			assume(isNewFunction, "Function already known", currentToken);
 
 			scope.pushScope();
-			for (const Function::Variable& var : parameters) { // TODO shitshow
+			for (const Function::Variable& var : parameters) {
 				const bool unknownVariable = scope.pushVariable(var.name, static_cast<size_t>(var.type));
 				assume(unknownVariable, "Variable already defined", currentToken);
 			}
@@ -362,10 +427,10 @@ namespace compiler {
 			rewireJump(jumpIndex, index());
 		}
 
-		void parse_return() { // TODO better!
+		void parse_return() {
 			assert(currentToken.opCode == base::OpCode::RETURN);
 			currentToken = tokenizer.next();
-			const uint32_t returnSize = currentToken.opCode == base::OpCode::END_STATEMENT ? 0 : 1;
+			const uint32_t returnSize = currentToken.opCode == base::OpCode::END_STATEMENT ? 0 : 1; // returns > 1 possible in future
 			embeddCodeStatement();
 			bytecode.push_back(base::Operation(base::OpCode::RETURN, returnSize));
 		}
@@ -401,7 +466,7 @@ namespace compiler {
 			assume(!currentToken.isEnd(), "Missing end statement!", currentToken);
 
 			if (tokens.size() > 0) {
-				shuntingYard(tokens);
+				shuntingYard(tokens.begin(), tokens.end());
 			}
 
 			currentToken = tokenizer.next();
@@ -440,6 +505,9 @@ namespace compiler {
 					case base::OpCode::WHILE:
 						parse_while();
 						break;
+					case base::OpCode::FOR:
+						parse_for();
+						break;
 					case base::OpCode::FUNC:
 						parse_function();
 						break;
@@ -457,6 +525,7 @@ namespace compiler {
 						insertRoundBrackets();
 						break;
 					case base::OpCode::END_STATEMENT:
+						currentToken = tokenizer.next();
 						break;
 					default:
 						throw ex::ParserException("Unknown token", currentToken.pos);
@@ -498,7 +567,7 @@ namespace compiler {
 
 					insertJump(base::OpCode::CALL_FUNCTION, index(), mainPosition.value());
 					bytecode.back().side_unsignedData() = 0;
-					
+
 					bytecode.push_back(base::Operation(base::OpCode::END_PROGRAM));
 				}
 			} catch (const ex::ParserException& ex) {

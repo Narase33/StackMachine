@@ -32,9 +32,10 @@ func main() {
 
 		try {
 			Compiler compiler(std::move(code));
+			base::Program program = compiler.run();
 			REQUIRE(compiler.isSuccess());
 
-			StackMachine machine(compiler.run());
+			StackMachine machine(std::move(program));
 			INFO(machine.toString());
 			machine.exec();
 

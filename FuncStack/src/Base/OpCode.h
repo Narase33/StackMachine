@@ -10,7 +10,7 @@ namespace base {
 
 		// Lexer
 		END_STATEMENT, COMMA,
-		IF, ELSE, WHILE,
+		IF, ELSE, WHILE, FOR,
 		CONTINUE, BREAK,
 		BRACKET_ROUND_OPEN, BRACKET_ROUND_CLOSE,
 		BRACKET_CURLY_OPEN, BRACKET_CURLY_CLOSE,
@@ -50,6 +50,7 @@ namespace base {
 			SM_REGISTER_NAME(OpCode::IF, "if");
 			SM_REGISTER_NAME(OpCode::ELSE, "else");
 			SM_REGISTER_NAME(OpCode::WHILE, "while");
+			SM_REGISTER_NAME(OpCode::FOR, "for");
 			SM_REGISTER_NAME(OpCode::CONTINUE, "continue");
 			SM_REGISTER_NAME(OpCode::BREAK, "break");
 			SM_REGISTER_NAME(OpCode::BRACKET_ROUND_OPEN, "(");
@@ -110,6 +111,7 @@ namespace base {
 		if (keyword == "if") return OpCode::IF;
 		if (keyword == "else") return OpCode::ELSE;
 		if (keyword == "while") return OpCode::WHILE;
+		if (keyword == "for") return OpCode::FOR;
 		if (keyword == "continue") return OpCode::CONTINUE;
 		if (keyword == "break") return OpCode::BREAK;
 		if (keyword == "func") return OpCode::FUNC;
