@@ -27,8 +27,8 @@ namespace stackmachine {
 			dataStack[offset] = std::move(variableValue);
 		}
 
-		base::BasicType getVariable(size_t offset) const {
-			offset += functionFrames.top();
+		base::BasicType getVariable(size_t relativeOffset) const {
+			const size_t offset = relativeOffset + functionFrames.top();
 			assert(offset < dataStack.size());
 			return dataStack[offset];
 		}
