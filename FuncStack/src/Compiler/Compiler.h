@@ -277,38 +277,25 @@ namespace compiler {
 			}
 		}
 
-		void insertLoop(const TokenList& initialization, const TokenList& condition, const TokenList& iteration) {
-			assert(currentToken.opCode == base::OpCode::FOR);
-
-			currentToken = tokenizer.next("Missing round brackets after 'while'", base::OpCode::BRACKET_ROUND_OPEN);
-			const std::vector<Token> loopHead = unwindGroup();
-
-			const Iterator beginDeclaration = loopHead.begin();
-			const Iterator endDeclaration = std::find_if(loopHead.begin(), loopHead.end(), isOpCode<base::OpCode::END_STATEMENT>);
-			assume(endDeclaration != loopHead.end(), "Missing condition section in for-loop head", currentToken);
-
-			const Iterator beginCondition = endDeclaration + 1;
-			assume(beginCondition->opCode != base::OpCode::TYPE, "No declaration in this section allowed", *beginCondition);
-			const Iterator endCondition = std::find_if(beginCondition, loopHead.end(), isOpCode<base::OpCode::END_STATEMENT>);
-			assume(endCondition != loopHead.end(), "Missing iterative section in for-loop head", currentToken);
-
-			const Iterator beginIteration = endCondition + 1;
-			assume(beginIteration->opCode != base::OpCode::TYPE, "No declaration in this section allowed", *beginIteration);
-			const Iterator endIteration = loopHead.end();
-
+		void insertLoop(std::optional<std::pair<Iterator, Iterator>> initialization, std::pair<Iterator, Iterator> condition, std::optional<std::pair<Iterator, Iterator>> iteration) {
 			scope.pushScope();
 
-			embeddExpression(beginDeclaration, endDeclaration); // <- declaration
+			if (initialization.has_value()) {
+				embeddExpression(initialization->first, initialization->second); // <- initialization
+			}
 
 			const size_t headIndex = index();
-			insertSortedTokens(shuntingYard(beginCondition, endCondition)); // <- condition
+			insertSortedTokens(shuntingYard(condition.first, condition.second)); // <- condition
 
 			bytecode.push_back(base::Operation(base::OpCode::JUMP_IF_NOT, 0));
 			const size_t jumpIndex = index();
 
 			scope.pushLoop();
 			compileStatement();
-			insertSortedTokens(shuntingYard(beginIteration, endIteration)); // <- iteration
+
+			if (iteration.has_value()) {
+				insertSortedTokens(shuntingYard(iteration->first, iteration->second)); // <- iteration
+			}
 			const std::vector<ScopeDict::Breaker> breakers = scope.popLoop();
 
 			insertJump(base::OpCode::JUMP, index(), headIndex);
@@ -343,39 +330,10 @@ namespace compiler {
 			const size_t headIndex = index();
 
 			currentToken = tokenizer.next("Missing round brackets after 'while'", base::OpCode::BRACKET_ROUND_OPEN);
-			insertRoundBrackets();
-
-			bytecode.push_back(base::Operation(base::OpCode::JUMP_IF_NOT, 0));
-			const size_t jumpIndex = index();
-
-			scope.pushLoop();
-			scope.pushScope();
-			compileStatement();
-			popScope();
-			const std::vector<ScopeDict::Breaker> breakers = scope.popLoop();
-
-			insertJump(base::OpCode::JUMP, index(), headIndex);
-			const size_t indexAfterLoop = index();
-			rewireJump(jumpIndex, indexAfterLoop);
-
-			for (const ScopeDict::Breaker& breaker : breakers) {
-				switch (breaker.token.opCode) {
-					case base::OpCode::CONTINUE:
-						rewireJump(breaker.index, headIndex + 1); /* "pc++" */
-						break;
-					case base::OpCode::BREAK:
-						rewireJump(breaker.index, indexAfterLoop);
-						break;
-					default:
-						throw ex::ParserException("Unexpected breaker", breaker.token.pos);
-				}
-
-				base::Operation& endScopeOp = bytecode[breaker.index - 1];
-				assert(endScopeOp.getOpCode() == base::OpCode::POP);
-				const int32_t levelsToBreak = breaker.level - scope.level();
-				assume(levelsToBreak > 0, "Too many levels to break", currentToken);
-				endScopeOp.signedData() = breaker.variables - scope.sizeLocalVariables();
-			}
+			const TokenList condition = unwindGroup();
+			assume(condition.size() > 0, "Missing condition in while-loop", currentToken);
+			assume(condition.front().opCode != base::OpCode::TYPE, "No declaration in this section allowed", condition.front());
+			insertLoop({}, std::make_pair(condition.begin(), condition.end()), {});
 		}
 
 		void parse_for() {
@@ -384,58 +342,21 @@ namespace compiler {
 			currentToken = tokenizer.next("Missing round brackets after 'while'", base::OpCode::BRACKET_ROUND_OPEN);
 			const std::vector<Token> loopHead = unwindGroup();
 
-			const Iterator beginDeclaration = loopHead.begin();
-			const Iterator endDeclaration = std::find_if(loopHead.begin(), loopHead.end(), isOpCode<base::OpCode::END_STATEMENT>);
-			assume(endDeclaration != loopHead.end(), "Missing condition section in for-loop head", currentToken);
+			const Iterator beginInitialization = loopHead.begin();
+			const Iterator endInitialization = std::find_if(loopHead.begin(), loopHead.end(), isOpCode<base::OpCode::END_STATEMENT>);
+			assume(endInitialization != loopHead.end(), "Missing condition section in for-loop head", currentToken);
 
-			const Iterator beginCondition = endDeclaration + 1;
-			assume(beginCondition->opCode != base::OpCode::TYPE, "No declaration in this section allowed", *beginCondition);
+			const Iterator beginCondition = endInitialization + 1;
 			const Iterator endCondition = std::find_if(beginCondition, loopHead.end(), isOpCode<base::OpCode::END_STATEMENT>);
+			assume(beginCondition != endCondition, "Missing condition in while-loop", *beginCondition);
+			assume(beginCondition->opCode != base::OpCode::TYPE, "No declaration in this section allowed", *beginCondition);
 			assume(endCondition != loopHead.end(), "Missing iterative section in for-loop head", currentToken);
 
 			const Iterator beginIteration = endCondition + 1;
 			assume(beginIteration->opCode != base::OpCode::TYPE, "No declaration in this section allowed", *beginIteration);
 			const Iterator endIteration = loopHead.end();
 
-			scope.pushScope();
-
-			embeddExpression(beginDeclaration, endDeclaration); // <- declaration
-
-			const size_t headIndex = index();
-			insertSortedTokens(shuntingYard(beginCondition, endCondition)); // <- condition
-
-			bytecode.push_back(base::Operation(base::OpCode::JUMP_IF_NOT, 0));
-			const size_t jumpIndex = index();
-
-			scope.pushLoop();
-			compileStatement();
-			insertSortedTokens(shuntingYard(beginIteration, endIteration)); // <- iteration
-			const std::vector<ScopeDict::Breaker> breakers = scope.popLoop();
-
-			insertJump(base::OpCode::JUMP, index(), headIndex);
-			const size_t indexAfterLoop = index();
-			rewireJump(jumpIndex, indexAfterLoop);
-
-			popScope();
-
-			for (const ScopeDict::Breaker& breaker : breakers) {
-				switch (breaker.token.opCode) {
-					case base::OpCode::CONTINUE:
-						rewireJump(breaker.index, headIndex + 1); /* "pc++" */
-						break;
-					case base::OpCode::BREAK:
-						rewireJump(breaker.index, indexAfterLoop);
-						break;
-					default:
-						throw ex::ParserException("Unexpected breaker", breaker.token.pos);
-				}
-
-				base::Operation& endScopeOp = bytecode[breaker.index - 1];
-				assert(endScopeOp.getOpCode() == base::OpCode::POP);
-				const int32_t levelsToBreak = breaker.level - scope.level();
-				assume(levelsToBreak > 0, "Too many levels to break", currentToken);
-				endScopeOp.signedData() = breaker.variables - scope.sizeLocalVariables();
-			}
+			insertLoop(std::make_pair(beginInitialization, endInitialization), std::make_pair(beginCondition, endCondition), std::make_pair(beginIteration, endIteration));
 		}
 
 		Function::Variable extractParameter() {
