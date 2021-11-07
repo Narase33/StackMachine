@@ -228,6 +228,53 @@ namespace compiler {
 			}
 		}
 
+		std::vector<size_t> expectedType(const TokenList& sortedTokens) const {
+			std::stack<size_t, std::vector<size_t>> opStack;
+			for (const Token& t : sortedTokens) {
+				switch (t.opCode) {
+					case base::OpCode::LOAD_LITERAL:
+						opStack.push(t.value.index() - 2); // TODO temp workaround
+						break;
+					case base::OpCode::NAME:
+						opStack.push(scope.typeOf(t));
+						break;
+					case base::OpCode::ADD:
+					case base::OpCode::SUB:
+					case base::OpCode::MULT:
+					case base::OpCode::DIV:
+					{
+						const size_t type1 = top_and_pop(opStack);
+						const size_t type2 = top_and_pop(opStack);
+						assume(type1 == type2, "Incomplete types during verification", t);
+						opStack.push(type1);
+						break;
+					}
+					case base::OpCode::INCR:
+					case base::OpCode::DECR:
+						break; // type stays the same
+					case base::OpCode::BIGGER:
+					case base::OpCode::LESS:
+					case base::OpCode::EQ:
+					case base::OpCode::UNEQ:
+					{
+						const size_t type1 = top_and_pop(opStack);
+						const size_t type2 = top_and_pop(opStack);
+						assume(type1 == type2, "Incomplete types during verification", t);
+						opStack.push(static_cast<size_t>(base::TypeIndex::Bool));
+						break;
+					}
+					default:
+						throw ex::ParserException("Unknown type", t.pos);
+				}
+			}
+
+			std::vector<size_t> types;
+			while (!opStack.empty()) {
+				types.push_back(top_and_pop(opStack));
+			}
+			return types;
+		}
+
 		void insertCurlyBrackets() {
 			scope.pushScope();
 			assert(currentToken.opCode == base::OpCode::BRACKET_CURLY_OPEN);
@@ -285,7 +332,11 @@ namespace compiler {
 			}
 
 			const size_t headIndex = index();
-			insertSortedTokens(shuntingYard(condition.first, condition.second)); // <- condition
+			const TokenList sortedTokens = shuntingYard(condition.first, condition.second);
+			const std::vector<size_t> typeResults = expectedType(sortedTokens);
+			assume(typeResults.size() == 1, "Condition needs to have exactly one result", *condition.first);
+			assume(typeResults.front() == static_cast<size_t>(base::TypeIndex::Bool), "Condition needs boolean as result type", *condition.first);
+			insertSortedTokens(sortedTokens); // <- condition
 
 			bytecode.push_back(base::Operation(base::OpCode::JUMP_IF_NOT, 0));
 			const size_t jumpIndex = index();

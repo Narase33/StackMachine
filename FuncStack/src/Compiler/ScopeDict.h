@@ -5,12 +5,21 @@
 #include "Token.h"
 
 namespace compiler {
-	template <typename T>
-	class EntityContainer {
-		using Iterator = std::vector<T>::const_iterator;
+	struct Variable {
+		size_t level;
+		std::string name;
+		size_t type;
+
+		bool operator==(const Variable& other) const {
+			return this->name == other.name;
+		}
+	};
+
+	class VariableContainer {
+		using Iterator = std::vector<Variable>::const_iterator;
 
 	public:
-		bool add(T t) {
+		bool add(Variable t) {
 			if (has(t)) {
 				return false;
 			}
@@ -19,14 +28,22 @@ namespace compiler {
 			return true;
 		}
 
-		bool has(const T& other) const {
+		bool has(const Variable& other) const {
 			return _getIt(other) != entities.end();
 		}
 
-		std::optional<size_t> offset(const T& other) const {
+		std::optional<size_t> offset(const Variable& other) const {
 			const auto pos = _getIt(other);
 			if (pos != entities.end()) {
 				return std::distance(entities.begin(), pos);
+			}
+			return {};
+		}
+
+		std::optional<size_t> type(const Variable& other) const {
+			const auto pos = _getIt(other);
+			if (pos != entities.end()) {
+				return pos->type;
 			}
 			return {};
 		}
@@ -43,19 +60,19 @@ namespace compiler {
 			return entities.size();
 		}
 
-		std::vector<T>& list() {
+		std::vector<Variable>& list() {
 			return entities;
 		}
 
-		const std::vector<T>& list() const {
+		const std::vector<Variable>& list() const {
 			return entities;
 		}
 
 	private:
-		std::vector<T> entities;
+		std::vector<Variable> entities;
 
-		const Iterator _getIt(const T& other) const {
-			return std::find_if(entities.begin(), entities.end(), [&](const T& t) {
+		const Iterator _getIt(const Variable& other) const {
+			return std::find_if(entities.begin(), entities.end(), [&](const Variable& t) {
 				return t == other;
 			});
 		}
@@ -68,16 +85,6 @@ namespace compiler {
 		struct Breaker {
 			size_t index, breakCount, level, variables;
 			Token token;
-		};
-
-		struct Variable {
-			size_t level;
-			std::string name;
-			size_t type;
-
-			bool operator==(const Variable& other) const {
-				return this->name == other.name;
-			}
 		};
 
 		ScopeDict() = default;
@@ -144,16 +151,8 @@ namespace compiler {
 				or globalVariables.has({ 0, variableName, 0 });
 		}
 
-		std::optional<size_t> offsetLocalVariable(const std::string& variableName) const {
-			return variables.offset({ 0, variableName, 0 });
-		}
-
 		size_t sizeLocalVariables() const {
 			return variables.size();
-		}
-
-		std::optional<size_t> offsetGlobalVariable(const std::string& variableName) const {
-			return globalVariables.offset({ 0, variableName, 0 });
 		}
 
 		// === Other ====
@@ -161,12 +160,12 @@ namespace compiler {
 		base::Operation createStoreOperation(const Token& token) const {
 			const std::string& name = std::get<std::string>(token.value);
 
-			std::optional<size_t> variableOffset = offsetLocalVariable(name);
+			std::optional<size_t> variableOffset = variables.offset({ 0, name, 0 });
 			if (variableOffset.has_value()) {
 				return base::Operation(base::OpCode::STORE_LOCAL, variableOffset.value());
 			}
 
-			variableOffset = offsetGlobalVariable(name);
+			variableOffset = globalVariables.offset({ 0, name, 0 });
 			if (variableOffset.has_value()) {
 				return base::Operation(base::OpCode::STORE_GLOBAL, variableOffset.value());
 			}
@@ -177,12 +176,12 @@ namespace compiler {
 		base::Operation createLoadOperation(const Token& token) const {
 			const std::string& name = std::get<std::string>(token.value);
 
-			std::optional<size_t> variableOffset = offsetLocalVariable(name);
+			std::optional<size_t> variableOffset = variables.offset({ 0, name, 0 });
 			if (variableOffset.has_value()) {
 				return base::Operation(base::OpCode::LOAD_LOCAL, variableOffset.value());
 			}
 
-			variableOffset = offsetGlobalVariable(name);
+			variableOffset = globalVariables.offset({ 0, name, 0 });
 			if (variableOffset.has_value()) {
 				return base::Operation(base::OpCode::LOAD_GLOBAL, variableOffset.value());
 			}
@@ -190,10 +189,25 @@ namespace compiler {
 			throw ex::ParserException("used variable not declared", token.pos);
 		}
 
+		size_t typeOf(const Token& token) const {
+			const std::string& name = std::get<std::string>(token.value);
+
+			std::optional<size_t> type = variables.type({ 0, name, 0 });
+			if (!type.has_value()) {
+				type = globalVariables.type({ 0, name , 0 });
+			}
+
+			if (!type.has_value()) {
+				throw ex::ParserException("used variable not declared", token.pos);
+			}
+
+			return type.value();
+		}
+
 	private:
 		std::vector<Breaker> breakers;
-		EntityContainer<Variable> variables;
-		EntityContainer<Variable> globalVariables;
+		VariableContainer variables;
+		VariableContainer globalVariables;
 
 		size_t scopeLevel = 0;
 
