@@ -2,34 +2,12 @@
 
 #include <vector>
 
-#include "Operation.h"
+#include "LiteralStore.h"
 
 namespace base {
 	struct Program {
 		Bytecode bytecode;
-		std::vector<BasicType> constants;
-
-		size_t addConstant(BasicType value) {
-			const auto pos = std::find_if(constants.begin(), constants.end(), [&](const BasicType& b) {
-				return (b == value).getBool();
-			});
-
-			const size_t index = std::distance(constants.begin(), pos);
-			if (pos == constants.end()) {
-				constants.push_back(std::move(value));
-			}
-
-			return index;
-		}
-
-		base::Operation loadLiteralOperation(BasicType value) {
-			return base::Operation(base::OpCode::LOAD_LITERAL, addConstant(value));
-		}
-
-		const BasicType& getConstant(size_t index) const {
-			assert(constants.size() > index);
-			return constants[index];
-		}
+		base::LiteralStore literals;
 
 		void spliceBytecode(std::vector<Operation> toSplice) {
 			bytecode.insert(bytecode.end(), toSplice.begin(), toSplice.end());

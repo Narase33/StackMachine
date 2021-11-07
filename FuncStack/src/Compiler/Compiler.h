@@ -209,11 +209,11 @@ namespace compiler {
 						bytecode.push_back(base::Operation(opCode));
 						break;
 					case base::OpCode::LOAD_LITERAL:
-						bytecode.push_back(base::Operation(base::OpCode::LOAD_LITERAL, program.addConstant(literalToValue(*it))));
+						bytecode.push_back(base::Operation(base::OpCode::LOAD_LITERAL, it->getNumber()));
 						break;
 					case base::OpCode::NAME:
 					{
-						const std::string& name = it->get<std::string>();
+						const std::string& name = it->getString();
 						if (functions.has(name)) {
 							insertJump(base::OpCode::CALL_FUNCTION, index(), functions.offset(name).value());
 							bytecode.back().side_unsignedData() = functions.paramCount(name);
@@ -233,7 +233,7 @@ namespace compiler {
 			for (const Token& t : sortedTokens) {
 				switch (t.opCode) {
 					case base::OpCode::LOAD_LITERAL:
-						opStack.push(t.value.index() - 2); // TODO temp workaround
+						opStack.push(static_cast<size_t>(tokenizer.literals.get(t.getNumber()).typeId()));
 						break;
 					case base::OpCode::NAME:
 						opStack.push(scope.typeOf(t));
@@ -418,7 +418,7 @@ namespace compiler {
 			const Token paramName = currentToken;
 
 			currentToken = tokenizer.next(base::OpCode::COMMA, base::OpCode::BRACKET_ROUND_CLOSE);
-			return Function::Variable{ static_cast<base::TypeIndex>(paramType.get<size_t>()), paramName.get<std::string>() };
+			return Function::Variable{ static_cast<base::TypeIndex>(paramType.getNumber()), paramName.getString() };
 		}
 
 		std::vector<Function::Variable> extractFunctionParameters() {
@@ -459,7 +459,7 @@ namespace compiler {
 			bytecode.push_back(base::Operation(base::OpCode::JUMP, 0));
 			const size_t jumpIndex = index();
 
-			bool isNewFunction = functions.push(functionName.get<std::string>(), returnType, parameters, index());
+			bool isNewFunction = functions.push(functionName.getString(), returnType, parameters, index());
 			assume(isNewFunction, "Function already known", currentToken);
 
 			scope.pushScope();
@@ -494,8 +494,8 @@ namespace compiler {
 			currentToken = tokenizer.next();
 			if (currentToken.opCode != base::OpCode::END_STATEMENT) {
 				assume(currentToken.opCode == base::OpCode::LOAD_LITERAL, "expected literal after keyword", currentToken);
-				assume(std::holds_alternative<base::sm_int>(currentToken.value), "expected literal after keyword", currentToken);
-				levelsToJump = std::get<base::sm_int>(currentToken.value);
+				assume(currentToken.hasNumber(), "expected literal after keyword", currentToken);
+				levelsToJump = tokenizer.literals.get(currentToken.getNumber()).getInt();
 				assume(levelsToJump > 0, "jump levels must be > 0", currentToken);
 				currentToken = tokenizer.next(base::OpCode::END_STATEMENT);
 			}
@@ -625,6 +625,7 @@ namespace compiler {
 				synchronize(ex);
 			}
 
+			program.literals = std::move(tokenizer.literals);
 			return std::move(program);
 		}
 	};

@@ -8,6 +8,7 @@
 #include <sstream>
 
 #include "Token.h"
+#include "src/Base/LiteralStore.h"
 #include "src/Utils/Source.h"
 
 namespace compiler {
@@ -79,12 +80,12 @@ namespace compiler {
 
 			if (view.startsWith("true")) {
 				view.removePrefix(4);
-				return Token(base::OpCode::LOAD_LITERAL, true, pos); // Literal Bool
+				return Token(base::OpCode::LOAD_LITERAL, literals.push(true), pos); // Literal Bool
 			}
 
 			if (view.startsWith("false")) {
 				view.removePrefix(5);
-				return Token(base::OpCode::LOAD_LITERAL, false, pos); // Literal Bool
+				return Token(base::OpCode::LOAD_LITERAL, literals.push(false), pos); // Literal Bool
 			}
 
 			if (std::isdigit(*view)) {
@@ -101,7 +102,7 @@ namespace compiler {
 						view.removePrefix(digitsAfterDot.length());
 
 						if (!std::isalpha(*view)) {
-							return Token(base::OpCode::LOAD_LITERAL, std::stod(number.str()), pos); // Literal Double
+							return Token(base::OpCode::LOAD_LITERAL, literals.push(std::stod(number.str())), pos); // Literal Double
 						}
 					}
 
@@ -110,10 +111,10 @@ namespace compiler {
 
 				if (!view.isEnd() and (*view == 'u')) {
 					view.removePrefix(1);
-					return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_uint>(std::stoull(number.str())), pos); // Literal Long
+					return Token(base::OpCode::LOAD_LITERAL, literals.push(std::stoull(number.str())), pos); // Literal Long
 				}
 
-				return Token(base::OpCode::LOAD_LITERAL, static_cast<base::sm_int>(std::stoll(number.str())), pos); // Literal Long
+				return Token(base::OpCode::LOAD_LITERAL, literals.push(std::stoll(number.str())), pos); // Literal Long
 			}
 
 			return {};
@@ -277,6 +278,8 @@ namespace compiler {
 		}
 
 	public:
+		base::LiteralStore literals;
+
 		Tokenizer(const std::string& source) :
 			view(source) {
 		}

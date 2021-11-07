@@ -60,7 +60,7 @@ namespace stackmachine {
 					}
 						break;
 					case base::OpCode::LOAD_LITERAL:
-						dataStack.push_back(program.getConstant(pc->unsignedData()));
+						dataStack.push_back(program.literals.get(pc->unsignedData()));
 						break;
 					case base::OpCode::STORE_LOCAL:
 						setVariable(pc->unsignedData(), pop());
@@ -144,10 +144,10 @@ namespace stackmachine {
 			std::ostringstream stream;
 
 			stream << "Literals:\n";
-			for (int i = 0; i < program.constants.size(); i++) {
+			for (int i = 0; i < program.literals.size(); i++) {
 				stream << std::setw(3) << std::right << i << " | " << std::setw(20) << std::left;
-				stream << program.constants[i].toString() << " ";
-				stream << " (" << idToString(program.constants[i].typeId()) << ")\n";
+				stream << program.literals[i].toString() << " ";
+				stream << " (" << idToString(program.literals[i].typeId()) << ")\n";
 			}
 
 			stream << "\nStack:\n";
@@ -173,7 +173,7 @@ namespace stackmachine {
 						stream << value << " -> " << (i + value);
 						break;
 					case base::OpCode::LOAD_LITERAL:
-						stream << value << " (" << program.constants[value].toString() << ")";
+						stream << value << " (" << program.literals[value].toString() << ")";
 						break;
 					case base::OpCode::CALL_FUNCTION:
 						stream << op.side_unsignedData() << " params; jump " << value << " -> " << (i + value);
