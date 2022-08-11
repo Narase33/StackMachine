@@ -21,7 +21,8 @@ In this case the feature changes in order to have a syntax thats better/faster t
 
 Since the project is far away from beeing finished there is no plug&play way of actually using it at this time. You can start the project and see that the UnitTests are successful, but thats it.
 
-UnitTests are currently also the best way to see what features the language already has what it looks like.
+UnitTests are currently also the best way to see what features the language already has and what it looks like.
+The lastest feature is functions with parameters.
 
 This project has the goal to be easy to build.
 I won't use any libs that need to be installed (except for the STL, ofc), even if that means to reinvent the wheel from time to time.
