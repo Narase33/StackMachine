@@ -2,11 +2,11 @@
 ## The repository
 A stackmachine (hobby project)
 
-StackMachine is a hobby project I created to get myself into VMs and interpreters and to stay in touch with the C++ programming language, which I dont use during my normal job as software engineer.
+StackMachine is a hobby project I created to get myself into VMs and interpreters and to stay in touch with the C++ programming language.
 
 There is no specific goal to this project except for keeping me busy with C++ and learning new techniques in software development in general.
 
-If you found my repository and you have questions or suggestions about my project or code, feel free to contact me. I'm far away from beeing a professional C++ developer as I'm 99% self-taught, so excuse any rookie mistakes I might have done. I'd be happy to help or learn from others.
+If you found my repository and you have questions or suggestions about my project or code, feel free to contact me. I'd be happy to help or learn from others.
 
 ## The project
 The project implements a stackmachine (https://en.wikipedia.org/wiki/Stack_machine). It doesn't interpret on the pure text like Python, but creates a bytecode in the first step, so it's more like Java. The interpreted language will look C'ish.
